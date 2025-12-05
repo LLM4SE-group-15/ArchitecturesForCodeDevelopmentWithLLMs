@@ -1,0 +1,29 @@
+# LLM Framework
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langgraph>=0.0.20
+langsmith>=0.0.70
+
+# OpenAI
+openai>=1.0.0
+
+# Code Quality & Analysis
+radon>=6.0.1
+pylint>=3.0.0
+flake8>=7.0.0
+black>=23.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Data & Analysis
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+tqdm>=4.65.0
