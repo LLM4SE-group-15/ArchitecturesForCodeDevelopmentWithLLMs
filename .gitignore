@@ -42,7 +42,6 @@ ENV/
 logs/
 
 # Results and outputs
-results/
 outputs/
 *.csv
 *.json

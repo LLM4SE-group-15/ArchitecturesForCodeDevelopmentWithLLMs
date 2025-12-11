@@ -72,19 +72,3 @@ python main.py --architecture single
 # Multi-agent only
 python main.py --architecture multi
 ```
-
-## Project Structure
-
-```
-.
-├── src/
-│   ├── agents/          # Agent implementations
-│   ├── evaluation/      # Evaluation framework
-│   └── utils/           # Utilities
-├── tasks/               # Task dataset
-├── results/             # Experiment results
-├── docs/                # Documentation
-├── main.py              # Main execution script
-├── requirements.txt     # Dependencies
-└── .env                 # Configuration (not in git)
-```
