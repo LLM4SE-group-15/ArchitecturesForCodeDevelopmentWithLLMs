@@ -88,10 +88,3 @@ python main.py --architecture multi
 ├── requirements.txt     # Dependencies
 └── .env                 # Configuration (not in git)
 ```
-
-## Next Steps
-
-1. Add more tasks to `tasks/` directory
-2. Customize agent prompts in `src/utils/prompts.py`
-3. Run experiments with `python main.py`
-4. Analyze results in `results/` directory

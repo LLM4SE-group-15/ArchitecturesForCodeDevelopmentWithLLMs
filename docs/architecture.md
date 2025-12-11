@@ -73,16 +73,3 @@ Task → Planner → Developer → Reviewer → Tester
 - **Data Analysis**: pandas, matplotlib
 
 ---
-
-## Evaluation Pipeline
-
-```
-1. Load Task
-2. Generate Code (Single-Agent)
-3. Generate Code (Multi-Agent)
-4. Run Tests (Functional Correctness)
-5. Analyze Code (Quality Metrics)
-6. Collect Performance Data
-7. Store Results
-8. Compare Architectures
-```

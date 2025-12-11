@@ -58,6 +58,7 @@ outputs/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Test cache
 .pytest_cache/

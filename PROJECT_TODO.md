@@ -1,9 +1,7 @@
 # 📋 PROJECT A2 - COMPLETE TODO LIST
 
 **Project**: Adaptive Multi-Agent System (AMAS) vs Single-Agent Baseline  
-**Team**: LLM4SE-group-15 (5 people)  
-**Timeline**: 5 weeks  
-**Last Updated**: December 5, 2025
+**Team**: LLM4SE-group-15 (5 people)   
 
 ---
 
