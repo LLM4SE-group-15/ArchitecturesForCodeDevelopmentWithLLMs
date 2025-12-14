@@ -270,17 +270,17 @@ if __name__ == "__main__":
     - [ ] Implement `analyze_and_plan()`:
       - Use PLANNER_PROMPT from prompts.py
       - Parse JSON response
-      - Validate difficulty scores (0.0-1.0)
-      - Return plan dict with subtasks
+      - Validate story points are one of {1, 2, 3, 5, 8}
+      - Return dict with `story_points` + `rationale`
     - [ ] Test with sample task
 
   - [ ] **DeveloperAgent**:
     - [ ] Initialize with agent_id
-    - [ ] Implement `implement(subtask, context)`:
+    - [ ] Implement `implement(task_description, story_points, plan_rationale, test_feedback)`:
       - Use DEVELOPER_PROMPT
-      - Generate code for subtask
+      - Generate code for the task
       - Return code string
-    - [ ] Implement `propose_solution(subtask)`:
+    - [ ] Implement `propose_solution(task_description, story_points)`:
       - Use DEVELOPER_PROPOSAL_PROMPT
       - Return proposed code
     - [ ] Test both methods
@@ -296,10 +296,7 @@ if __name__ == "__main__":
       - Return consensus code
 
   - [ ] **IntegratorAgent**:
-    - [ ] Implement `integrate_subtasks()`:
-      - Use INTEGRATOR_PROMPT
-      - Combine all subtask codes
-      - Return complete solution
+    - [ ] Removed (single-task workflow; no integration step)
 
   - [ ] **ReviewerAgent**:
     - [ ] Implement `review_code()`:
@@ -324,45 +321,23 @@ if __name__ == "__main__":
   - [ ] **Implement `_planner_node()`**:
     - [ ] Create PlannerAgent instance
     - [ ] Call `analyze_and_plan()`
-    - [ ] Update state with plan
-    - [ ] Log plan details
+    - [ ] Update state with `story_points` and rationale
     - [ ] Return updated state
 
-  - [ ] **Implement `_solo_developer_node()`**:
-    - [ ] Get current subtask from state
+  - [ ] **Implement `_router_node()`**:
+    - [ ] Select developer tier based on `story_points`
+    - [ ] Escalate tier on retries
+    - [ ] Store tier in state
+    - [ ] Return updated state
+
+  - [ ] **Implement `_developer_node()`**:
     - [ ] Create DeveloperAgent
-    - [ ] Call `implement()`
-    - [ ] Store result in `subtask_results`
-    - [ ] Increment `current_subtask_index`
+    - [ ] Call `implement()` with task description and state context
+    - [ ] Store code in state
     - [ ] Return updated state
-
-  - [ ] **Implement `_pair_developers_node()`**:
-    - [ ] Create 2 DeveloperAgent instances
-    - [ ] Both call `propose_solution()`
-    - [ ] Create CollaborationCoordinator
-    - [ ] Call `merge_pair_solutions()`
-    - [ ] Store merged result
-    - [ ] Increment index
-    - [ ] Return state
-
-  - [ ] **Implement `_team_developers_node()`**:
-    - [ ] Create 3 DeveloperAgent instances
-    - [ ] All call `implement()` with different focus
-    - [ ] Create IntegratorAgent
-    - [ ] Call `integrate_subtasks()` or team merge
-    - [ ] Store integrated result
-    - [ ] Increment index
-    - [ ] Return state
-
-  - [ ] **Implement `_integrator_node()`**:
-    - [ ] Get all `subtask_results` from state
-    - [ ] Create IntegratorAgent
-    - [ ] Call `integrate_subtasks()`
-    - [ ] Store in `integrated_code`
-    - [ ] Return state
 
   - [ ] **Implement `_reviewer_node()`**:
-    - [ ] Get `integrated_code` from state
+    - [ ] Get `code` from state
     - [ ] Create ReviewerAgent
     - [ ] Call `review_code()`
     - [ ] Store improved code in `reviewed_code`
@@ -378,14 +353,13 @@ if __name__ == "__main__":
     - [ ] Return state
 
   - [ ] **Verify routing logic**:
-    - [ ] `_route_subtask_execution()` works correctly
     - [ ] `_should_retry()` logic is correct
     - [ ] Max iterations = 3
 
   - [ ] **Test workflow**:
-    - [ ] Run with easy task (difficulty < 0.3) → should use solo
-    - [ ] Run with medium task (0.3-0.7) → should use pair
-    - [ ] Run with hard task (≥ 0.7) → should use team
+    - [ ] Run with easy task (story points 1-2) → should select tier S
+    - [ ] Run with medium task (story points 3-5) → should select tier M
+    - [ ] Run with hard task (story points 8) → should select tier L
     - [ ] Verify state transitions
     - [ ] Check LangSmith trace
 
