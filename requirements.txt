@@ -1,11 +1,12 @@
 # LLM Framework
 langchain>=0.1.0
-langchain-openai>=0.0.5
+langchain-huggingface>=0.0.3
 langgraph>=0.0.20
 langsmith>=0.0.70
 
-# OpenAI
-openai>=1.0.0
+# HuggingFace
+huggingface-hub>=0.20.0
+transformers>=4.36.0
 
 # Code Quality & Analysis
 radon>=6.0.1
