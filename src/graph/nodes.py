@@ -1,11 +1,9 @@
 from src.graph.state import GraphState, PlanOutput
-from src.graph.config import MODELS
-from src.models.prompts import PLANNER_SYSTEM_PROMPT, PLANNER_USER_PROMPT_TEMPLATE
-from src.models.llm_responses import PlannerResponse
-from src.agents.client import invoke_with_structured_output
+from src.agents.client import llm_client
+from src.graph.config import get_developer_tier
 
 
-def planner_node(state: GraphState) -> dict:
+def planner_node(state: GraphState) -> GraphState:
     """
     Planner node: assigns story points to the task.
     
@@ -21,22 +19,7 @@ def planner_node(state: GraphState) -> dict:
     task_id = state["task_id"]
     task_description = state["task_description"]
     
-    user_prompt = PLANNER_USER_PROMPT_TEMPLATE.format(
-        task_id=task_id,
-        task_description=task_description
-    )
-    
-    messages = [
-        {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt}
-    ]
-    
-    response: PlannerResponse = invoke_with_structured_output(
-        model_name=MODELS["planner"],
-        messages=messages,
-        response_model=PlannerResponse,
-        temperature=0.0
-    )
+    response = llm_client.planner(task_description, task_id)
     
     plan: PlanOutput = {
         "id": response.id,
@@ -44,9 +27,44 @@ def planner_node(state: GraphState) -> dict:
         "story_points": response.story_points,
         "rationale": response.rationale
     }
+
+    state["plan"] = plan
+    state["story_points_initial"] = response.story_points
+    state["story_points_current"] = response.story_points
+    state["developer_tier"] = get_developer_tier(response.story_points)
     
-    return {
-        "plan": plan,
-        "story_points_initial": response.story_points,
-        "story_points_current": response.story_points,
-    }
+    return state
+
+def router_node(state: GraphState) -> GraphState:
+    """
+    Router node: routes the task to the appropriate developer.
+    
+    Args:
+        state: Current graph state with story_points_current
+        
+    Returns:
+        Updated state fields: developer_tier
+    """
+    if not state["test_passed"]:
+        developer_tier = state["developer_tier"]
+
+        if developer_tier == "S":
+            state["developer_tier"] = "M"
+        elif developer_tier == "M":
+            state["developer_tier"] = "L"
+
+    return state
+
+def developer_node(state: GraphState) -> GraphState:
+    """
+    Developer node: generates code for the task.
+    
+    Uses Qwen 2.5-Coder-7B-Instruct to generate code for the task.
+    
+    Args:
+        state: Current graph state with plan and story_points_current
+        
+    Returns:
+        Updated state fields: generated_code, developer_tier
+    """
+

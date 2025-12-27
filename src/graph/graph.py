@@ -1,8 +1,12 @@
 from langgraph.graph import StateGraph, START, END
 
-from src.graph.state import GraphState
+from src.graph.state import GraphState, create_initial_state
 from src.graph.config import NodeNames
-from src.graph.nodes import planner_node
+from src.graph.nodes import (
+    planner_node,
+    router_node,
+    developer_node,
+)
 
 
 def build_graph() -> StateGraph:
@@ -10,27 +14,22 @@ def build_graph() -> StateGraph:
     graph = StateGraph(GraphState)
     
     graph.add_node(NodeNames.PLANNER, planner_node)
+    graph.add_node(NodeNames.ROUTER, router_node)
+    graph.add_node(NodeNames.DEVELOPER, developer_node)
     
     graph.add_edge(START, NodeNames.PLANNER)
-    graph.add_edge(NodeNames.PLANNER, END)
+    graph.add_edge(NodeNames.PLANNER, NodeNames.ROUTER)
+    graph.add_edge(NodeNames.ROUTER, NodeNames.DEVELOPER)
+    graph.add_edge(NodeNames.DEVELOPER, END)
     
     return graph.compile()
 
 
-def create_initial_state(task_id: str, task_description: str) -> GraphState:
-    return GraphState(
-        task_id=task_id,
-        task_description=task_description,
-        plan=None,
-        story_points_initial=None,
-        story_points_current=None,
-        escalations=0,
-        failure_history=[],
-        developer_tier=None,
-        generated_code=None,
-        review_feedback=None,
-        test_passed=None,
-        test_output=None,
-    )
+def run_graph(task_id: str, task_description: str):
+    graph = build_graph()
+    
+    initial_state = create_initial_state(task_id, task_description)
 
-graph = build_graph()
+    compiled_graph = graph.compile()
+
+    return compiled_graph.invoke(initial_state)
