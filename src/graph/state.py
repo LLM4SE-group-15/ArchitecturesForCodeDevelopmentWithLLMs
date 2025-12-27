@@ -20,9 +20,7 @@ class GraphState(TypedDict):
     
     escalations: int
     test_passed: bool
-    failure_history: list[str]
-
-    review_feedback: Optional[str] # Da riempire con il risultato del tester (eventuali errori)
+    failure_history: list[str] # Da riempire con il risultato del tester (eventuali errori)
     
     developer_tier: Optional[Literal["S", "M", "L"]]
     
@@ -40,6 +38,5 @@ def create_initial_state(task_id: str, task_description: str) -> GraphState:
         failure_history=[],
         developer_tier=None,
         generated_code=None,
-        review_feedback=None,
         test_passed=True,
     )
