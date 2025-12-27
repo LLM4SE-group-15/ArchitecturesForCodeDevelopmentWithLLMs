@@ -41,5 +41,5 @@ def create_initial_state(task_id: str, task_description: str) -> GraphState:
         developer_tier=None,
         generated_code=None,
         review_feedback=None,
-        test_passed=None,
+        test_passed=True,
     )

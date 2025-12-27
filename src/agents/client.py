@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_core.messages import HumanMessage, SystemMessage
-from src.models.llm_responses import PlannerResponse
-from src.models.prompts import PLANNER_SYSTEM_PROMPT, PLANNER_USER_PROMPT_TEMPLATE
+from src.models.llm_responses import PlannerResponse, DeveloperResponse
+from src.models.prompts import PLANNER_SYSTEM_PROMPT, PLANNER_USER_PROMPT_TEMPLATE, DEVELOPER_FIRST_PROMPT, DEVELOPER_AFTER_FAILURE
 from src.agents.llm import MODELS
 
 load_dotenv()
@@ -98,7 +98,56 @@ class LLMClient:
         )
         
         return response
+    
+    def developer(
+        self,
+        plan_description: str,
+        story_points: int,
+        developer_tier: str,
+        failure_history: str,
+        generated_code: str,
+        task_id: str,
+        test_passed: bool
+    ) -> DeveloperResponse:
+        """
+        Generate code for a given plan using the appropriate developer model.
+        
+        Args:
+            plan_description: Description of the coding plan
+            story_points: Current story points assigned to the task
+            developer_tier: Developer tier ("S", "M", "L")
+            task_id: Unique identifier for the task
+            test_passed: Whether the previous test passed
+        Returns:
+            Dict with generated code and test result
+        """
+
+        if test_passed:
+            prompt = DEVELOPER_FIRST_PROMPT.format(
+                story_points=story_points,
+                task_description=plan_description
+            )
+        else:
+            prompt = DEVELOPER_AFTER_FAILURE.format(
+                story_points=story_points,
+                task_description=plan_description,
+                generated_code=generated_code,
+                failure_history=failure_history
+            )
+        
+        messages = [
+            {"role": "system", "content": f"You are a {developer_tier} tier developer."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response: DeveloperResponse = self.invoke_with_structured_output(
+            model_name=MODELS["developer_" + developer_tier.lower()],
+            messages=messages,
+            response_model=DeveloperResponse,
+            temperature=0.0
+        )
+        
+        return response
 
 
-# Create a singleton instance for easy import
 llm_client = LLMClient()

@@ -49,9 +49,11 @@ def router_node(state: GraphState) -> GraphState:
         developer_tier = state["developer_tier"]
 
         if developer_tier == "S":
-            state["developer_tier"] = "M"
+            state["developer_tier"] = "M" 
+            state["story_points_current"] = 3
         elif developer_tier == "M":
             state["developer_tier"] = "L"
+            state["story_points_current"] = 8
 
     return state
 
@@ -67,4 +69,18 @@ def developer_node(state: GraphState) -> GraphState:
     Returns:
         Updated state fields: generated_code, developer_tier
     """
+    plan = state["plan"]
+    developer_tier = state["developer_tier"]
+    
+    response = llm_client.developer(
+        plan_description=plan["description"],
+        story_points=state["story_points_current"],
+        developer_tier=developer_tier,
+        task_id=plan["id"],
+        test_passed=state["test_passed"]
+    )
+    
+    state["generated_code"] = response.generated_code
+    
+    return state
 
