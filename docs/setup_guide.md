@@ -3,8 +3,7 @@
 ## Prerequisites
 
 - Python 3.10+
-- An LLM inference backend (local or hosted)
-- API keys as needed by your chosen backend
+- HuggingFace account with API token
 - LangSmith account (optional, for tracking)
 
 ## Installation
@@ -24,7 +23,7 @@ python -m venv venv
 
 **Windows (PowerShell):**
 ```powershell
-venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.ps1
 ```
 
 **macOS/Linux:**
@@ -44,65 +43,87 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and configure tracing (optional) and model names.
+Edit `.env` with your configuration:
 
-If you use an OpenAI-compatible endpoint (including local servers), set:
-```
-OPENAI_API_KEY=sk-...
-LANGCHAIN_API_KEY=lsv2_...
-```
+```env
+# Required
+HF_TOKEN=your_huggingface_token_here
 
-Model configuration for the new experimental setups:
+# Optional (for tracking)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langsmith_api_key_here
+LANGCHAIN_PROJECT=llm-code-architectures
 
-Architecture A (single-agent baseline):
-```
-BASELINE_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
-```
-
-Architecture B (multi-agent, single-model):
-```
-PLANNER_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
-DEVELOPER_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
-REVIEWER_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
+# Architecture Selection (A, B, or C)
+ARCHITECTURE=C
 ```
 
-Note: there is no separate `INTEGRATION_MODEL` in the current single-snippet
-workflow — Developers produce a single complete snippet per task.
+### Architecture Options
 
-Architecture C (multi-agent, multi-model hybrid):
-```
-PLANNER_MODEL=meta-llama/Llama-3.1-8B-Instruct
-REVIEWER_MODEL=meta-llama/Llama-3.1-8B-Instruct
+| Value | Description |
+|-------|-------------|
+| `A` | Single-agent baseline (Qwen-7B only) |
+| `B` | Multi-agent, single-model (Qwen-7B for all roles) |
+| `C` | Multi-agent, multi-model hybrid (specialized models per role) |
 
-DEV_S_MODEL=Qwen/Qwen2.5-Coder-1.5B-Instruct
-DEV_M_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
-DEV_L_MODEL=deepseek-ai/DeepSeek-Coder-V2-Instruct
-```
-
-Note: the **Tester is not an LLM**; it runs your Python unit tests.
+Model configurations are defined in `src/agents/llm.py` and selected automatically based on the `ARCHITECTURE` variable.
 
 ### 5. Verify Setup
 
 ```bash
-python -c "from src.utils.config import Config; Config.validate(); print('Setup OK!')"
+# Check architecture configuration
+python -c "from src.agents.llm import get_architecture; print('Architecture:', get_architecture())"
+
+# Load APPS dataset
+python -c "from src.data.task_loader import APPSTaskLoader; print('Tasks:', len(APPSTaskLoader()))"
+
+# Verify graph builds correctly
+python -c "from src.graph.graph import build_graph; print('Nodes:', list(build_graph().nodes.keys()))"
 ```
 
 ## Running Experiments
 
-### Run Both Architectures
+### Using Python
 
-```bash
-python main.py --tasks-dir tasks --output-dir results
+```python
+from src.graph.graph import run_graph
+from src.data.task_loader import APPSTaskLoader
+
+# Load a task
+loader = APPSTaskLoader()
+task = loader.get_task(0)
+
+# Run the graph
+result = run_graph(
+    task_id=task.task_id,
+    task_description=task.question,
+    test_inputs=task.inputs,
+    test_outputs=task.outputs
+)
+
+print(f"Test passed: {result['test_passed']}")
+print(f"Developer tier: {result['developer_tier']}")
+print(f"Escalations: {result['escalations']}")
 ```
 
-### Run Single Architecture
+### Switching Architectures
+
+To switch between architectures, change the `ARCHITECTURE` variable in `.env`:
 
 ```bash
-python main.py --architecture single
-python main.py --architecture multi
+# Edit .env
+ARCHITECTURE=A  # or B, or C
+```
 
-Planned/experimental flags (depending on your implementation):
-- `A`: single-agent baseline
-- `B`: multi-agent single-model
-- `C`: multi-agent multi-model hybrid (Planner/Reviewer + Dev-S/M/L)
+Or pass it programmatically:
+
+```python
+from src.graph.graph import run_graph
+from src.agents.llm import Architecture
+
+result = run_graph(
+    task_id="test_1",
+    task_description="...",
+    architecture=Architecture.A
+)
 ```

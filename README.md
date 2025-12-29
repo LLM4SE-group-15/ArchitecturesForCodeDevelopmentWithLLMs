@@ -31,15 +31,7 @@ src/
 └── models/          # Prompts and response models
 ```
 
-## Quick Test
-
-```bash
-# Check architecture
-python -c "from src.agents.llm import get_architecture; print(get_architecture())"
-
-# Load APPS dataset
-python -c "from src.data.task_loader import APPSTaskLoader; print(len(APPSTaskLoader()))"
-```
+---
 
 ## Docs
 
