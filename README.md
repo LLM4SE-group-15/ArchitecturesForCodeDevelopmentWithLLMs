@@ -1,38 +1,46 @@
 # A2: Architectures for Code Development with LLMs
 
-Comparative analysis of single-agent vs multi-agent LLM architectures for code generation tasks.
+Comparative analysis of single-agent vs multi-agent LLM architectures for code generation.
 
-## Project overview
-- ***A (Application)***: projects in which you will analyze the
-effectiveness of the application of LLMs in various Software Engineering tasks.
-- Responsible: prof. Riccardo Coppola
+## Setup
 
-**Project Track:** 
-- LLMs can generate code, but single-prompt interactions often fail on long or complex development tasks Multi-agent architectures may improve quality by splitting responsibilities (design, planning, writing, reviewing, debugging).
+```bash
+python -m venv venv
+.\venv\Scripts\Activate.ps1          # Windows
+pip install -r requirements.txt
+cp .env.example .env                  # Configure HF_TOKEN and ARCHITECTURE
+```
 
-**Task Selection**
-Select 10-20 programming tasks from:
-- Public datasets (HumanEval, MBPP, CodeNet subsets)
-- Past course assignments
-- Open-source code snippets
+## Architectures
 
-**System Implementation**
-- Single-Agent Baseline: One LLM generating complete code solutions
-- Multi-Agent System: ≥2 specialized agents with distinct roles (e.g., planning, development, review, testing)
+Set `ARCHITECTURE` in `.env`:
 
-**Evaluation Metrics**
-Choose at least one evaluation method:
-- Functional correctness (unit tests or provided test suites)
-- Static code quality metrics (complexity, maintainability indices)
-- Debugging performance (fault detection and fixing capabilities)
-- Readability and maintainability assessment
+| Value | Description |
+|-------|-------------|
+| `A` | Single-agent baseline (Qwen-7B) |
+| `B` | Multi-agent, single-model (Qwen-7B for all roles) |
+| `C` | Multi-agent, multi-model (specialized models per role) |
 
-This project evaluates the effectiveness of different LLM architectures in software engineering tasks, comparing:
-- **Single-Agent Baseline**: One LLM generating complete code solutions
-- **Multi-Agent System**: Multiple specialized agents with distinct roles (planning, development, review, testing)
+## Project Structure
 
-### Research Questions
+```
+src/
+├── agents/          # LLM calls (client.py, llm.py)
+├── graph/           # LangGraph workflow (nodes.py, graph.py, state.py)
+├── data/            # Dataset loading (task_loader.py)
+└── models/          # Prompts and response models
+```
 
-1. Which architectures produce higher-quality and more maintainable code?
-2. How do agent coordination strategies impact correctness?
-3. Does modular role separation improve code generation?
+## Quick Test
+
+```bash
+# Check architecture
+python -c "from src.agents.llm import get_architecture; print(get_architecture())"
+
+# Load APPS dataset
+python -c "from src.data.task_loader import APPSTaskLoader; print(len(APPSTaskLoader()))"
+```
+
+## Docs
+
+See `docs/` for detailed architecture documentation.

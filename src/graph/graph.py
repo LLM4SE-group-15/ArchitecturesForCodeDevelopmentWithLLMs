@@ -49,18 +49,32 @@ def build_graph(architecture: Architecture = None) -> StateGraph:
     return graph.compile()
 
 
-def run_graph(task_id: str, task_description: str, architecture: Architecture = None):
+def run_graph(
+    task_id: str,
+    task_description: str,
+    test_inputs: list[str] = None,
+    test_outputs: list[str] = None,
+    architecture: Architecture = None
+):
     """
     Run the graph workflow for a given task.
     
     Args:
         task_id: Unique identifier for the task
         task_description: Description of the coding task
+        test_inputs: List of stdin inputs for test cases
+        test_outputs: List of expected stdout outputs for test cases
         architecture: Architecture enum (A, B, or C). If None, reads from env.
         
     Returns:
         Final graph state after execution.
     """
     graph = build_graph(architecture)
-    initial_state = create_initial_state(task_id, task_description)
+    initial_state = create_initial_state(
+        task_id=task_id,
+        task_description=task_description,
+        test_inputs=test_inputs,
+        test_outputs=test_outputs
+    )
     return graph.invoke(initial_state)
+
