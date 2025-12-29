@@ -82,3 +82,15 @@ ERROR LOG:
 - Consider edge cases and error handling as per the task difficulty.
 - Use the appropriate language and libraries for the task.
 """
+
+SINGLE_AGENT_PROMPT = """You are an expert Python developer. Generate a complete solution for the following task.
+
+TASK:
+{task_description}
+
+## Instructions
+- Write clean, efficient, and well-documented Python code.
+- Handle all edge cases mentioned in the task description.
+- Include docstrings and type hints where appropriate.
+- Return only the code, no explanations.
+"""

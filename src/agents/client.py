@@ -5,8 +5,14 @@ from pydantic import BaseModel
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_core.messages import HumanMessage, SystemMessage
 from src.models.llm_responses import PlannerResponse, DeveloperResponse
-from src.models.prompts import PLANNER_SYSTEM_PROMPT, PLANNER_USER_PROMPT_TEMPLATE, DEVELOPER_FIRST_PROMPT, DEVELOPER_AFTER_FAILURE
-from src.agents.llm import MODELS
+from src.models.prompts import (
+    PLANNER_SYSTEM_PROMPT,
+    PLANNER_USER_PROMPT_TEMPLATE,
+    DEVELOPER_FIRST_PROMPT,
+    DEVELOPER_AFTER_FAILURE,
+    SINGLE_AGENT_PROMPT,
+)
+from src.agents.llm import Architecture, get_architecture, get_models
 
 load_dotenv()
 
@@ -17,12 +23,13 @@ class LLMClient:
     """
     LLM Client class for interacting with language models.
     
-    Provides methods for structured output generation and specialized
-    agent functions (planner, developer, etc.).
+    Supports architecture-aware model selection for A/B/C experimental setups.
     """
     
-    def __init__(self):
+    def __init__(self, architecture: Architecture = None):
         self.hf_token = os.getenv("HF_TOKEN")
+        self.architecture = architecture or get_architecture()
+        self.models = get_models(self.architecture)
     
     def _get_llm(self, model_name: str, temperature: float = 0.0) -> ChatHuggingFace:
         """Get a configured LLM client for the specified model."""
@@ -70,15 +77,8 @@ class LLMClient:
         """
         Plan a coding task by assigning story points.
         
-        Uses Llama 3.1-8B-Instruct to evaluate task difficulty
+        Uses configured planner model to evaluate task difficulty
         and assign Scrum-style story points (1-2-3-5-8).
-        
-        Args:
-            task_description: Description of the coding task
-            task_id: Unique identifier for the task
-            
-        Returns:
-            PlannerResponse with story points and rationale
         """
         user_prompt = PLANNER_USER_PROMPT_TEMPLATE.format(
             task_id=task_id,
@@ -90,14 +90,12 @@ class LLMClient:
             {"role": "user", "content": user_prompt}
         ]
         
-        response: PlannerResponse = self.invoke_with_structured_output(
-            model_name=MODELS["planner"],
+        return self.invoke_with_structured_output(
+            model_name=self.models["planner"],
             messages=messages,
             response_model=PlannerResponse,
             temperature=0.0
         )
-        
-        return response
     
     def developer(
         self,
@@ -111,17 +109,7 @@ class LLMClient:
     ) -> DeveloperResponse:
         """
         Generate code for a given plan using the appropriate developer model.
-        
-        Args:
-            plan_description: Description of the coding plan
-            story_points: Current story points assigned to the task
-            developer_tier: Developer tier ("S", "M", "L")
-            task_id: Unique identifier for the task
-            test_passed: Whether the previous test passed
-        Returns:
-            Dict with generated code and test result
         """
-
         if test_passed:
             prompt = DEVELOPER_FIRST_PROMPT.format(
                 story_points=story_points,
@@ -140,14 +128,34 @@ class LLMClient:
             {"role": "user", "content": prompt}
         ]
         
-        response: DeveloperResponse = self.invoke_with_structured_output(
-            model_name=MODELS["developer_" + developer_tier.lower()],
+        return self.invoke_with_structured_output(
+            model_name=self.models["developer_" + developer_tier.lower()],
             messages=messages,
             response_model=DeveloperResponse,
             temperature=0.0
         )
+    
+    def single_agent(self, task_description: str) -> DeveloperResponse:
+        """
+        Single-agent baseline: generate code in one call without planning/routing.
         
-        return response
+        Used only for Architecture A.
+        """
+        prompt = SINGLE_AGENT_PROMPT.format(task_description=task_description)
+        
+        messages = [
+            {"role": "system", "content": "You are an expert Python developer."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        return self.invoke_with_structured_output(
+            model_name=self.models["baseline"],
+            messages=messages,
+            response_model=DeveloperResponse,
+            temperature=0.0
+        )
 
 
-llm_client = LLMClient()
+def get_llm_client(architecture: Architecture = None) -> LLMClient:
+    """Factory function to get LLMClient with specified architecture."""
+    return LLMClient(architecture)

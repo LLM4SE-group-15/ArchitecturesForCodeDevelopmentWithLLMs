@@ -1,5 +1,5 @@
 from src.graph.state import GraphState, PlanOutput
-from src.agents.client import llm_client
+from src.agents.client import get_llm_client
 from src.graph.config import get_developer_tier
 
 
@@ -7,18 +7,13 @@ def planner_node(state: GraphState) -> GraphState:
     """
     Planner node: assigns story points to the task.
     
-    Uses Llama 3.1-8B-Instruct to evaluate task difficulty
+    Uses a model to evaluate task difficulty
     and assign Scrum-style story points (1-2-3-5-8).
-    
-    Args:
-        state: Current graph state with task_id and task_description
-        
-    Returns:
-        Updated state fields: plan, story_points_initial, story_points_current
     """
     task_id = state["task_id"]
     task_description = state["task_description"]
     
+    llm_client = get_llm_client()
     response = llm_client.planner(task_description, task_id)
     
     plan: PlanOutput = {
@@ -35,18 +30,16 @@ def planner_node(state: GraphState) -> GraphState:
     
     return state
 
+
 def router_node(state: GraphState) -> GraphState:
     """
     Router node: routes the task to the appropriate developer.
     
-    Args:
-        state: Current graph state with story_points_current
-        
-    Returns:
-        Updated state fields: developer_tier
+    On test failure, escalates to a higher tier developer (S -> M -> L).
     """
     if not state["test_passed"]:
         developer_tier = state["developer_tier"]
+        state["escalations"] += 1
 
         if developer_tier == "S":
             state["developer_tier"] = "M" 
@@ -57,25 +50,23 @@ def router_node(state: GraphState) -> GraphState:
 
     return state
 
+
 def developer_node(state: GraphState) -> GraphState:
     """
     Developer node: generates code for the task.
     
-    Uses Qwen 2.5-Coder-7B-Instruct to generate code for the task.
-    
-    Args:
-        state: Current graph state with plan and story_points_current
-        
-    Returns:
-        Updated state fields: generated_code, developer_tier
+    Uses the appropriate tier model based on story points and escalation.
     """
     plan = state["plan"]
     developer_tier = state["developer_tier"]
     
+    llm_client = get_llm_client()
     response = llm_client.developer(
         plan_description=plan["description"],
         story_points=state["story_points_current"],
         developer_tier=developer_tier,
+        failure_history="\n".join(state["failure_history"]),
+        generated_code=state["generated_code"] or "",
         task_id=plan["id"],
         test_passed=state["test_passed"]
     )
@@ -84,3 +75,16 @@ def developer_node(state: GraphState) -> GraphState:
     
     return state
 
+
+def single_agent_node(state: GraphState) -> GraphState:
+    """
+    Single-agent node: generates code in one call without planning/routing.
+    
+    Used only for Architecture A (single-agent baseline).
+    """
+    llm_client = get_llm_client()
+    response = llm_client.single_agent(state["task_description"])
+    
+    state["generated_code"] = response.generated_code
+    
+    return state

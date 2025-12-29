@@ -1,11 +1,10 @@
 from typing import TypedDict, Optional, Literal
 
-
 class PlanOutput(TypedDict):
     id: str
     description: str
     story_points: Literal[1, 2, 3, 5, 8]
-    rationale: str
+    rationale: str 
 
 
 class GraphState(TypedDict):
@@ -24,7 +23,7 @@ class GraphState(TypedDict):
     
     developer_tier: Optional[Literal["S", "M", "L"]]
     
-    generated_code: Optional[str]
+    generated_code: Optional[str] # Codice generato dal developer
 
 
 def create_initial_state(task_id: str, task_description: str) -> GraphState:
