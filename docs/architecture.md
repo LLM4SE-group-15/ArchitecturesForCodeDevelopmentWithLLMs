@@ -122,26 +122,17 @@ models per role* plus S/M/L routing.
 ## Technology Stack
 
 - **Orchestration**: LangGraph (StateGraph), LangChain
-- **Models**: Open-source LLMs (Qwen / Llama / DeepSeek) accessed via a chosen
-  inference backend (local or hosted)
+- **Models**: Open-source LLMs (Qwen / Llama / DeepSeek) via HuggingFace Inference API
 - **Tracking**: LangSmith (optional)
 - **Code analysis**: Radon, Pylint
-- **Testing**: pytest, unittest
-- **Analysis**: pandas, matplotlib
+- **Testing**: pytest, subprocess (for stdin/stdout tests)
+- **Analysis**: pandas, matplotlib, seaborn
 
-Note: the architecture now assumes atomic (single-snippet) tasks — no
-integration step is needed because the Developer returns a complete solution
-per task.
-
-## Evaluation / Logging
-
-All architectures run on the same task suite. Minimum tracked metrics:
-
-- **Functional correctness**: % tasks where all tests pass
-- **Cost**: tokens and/or latency per task
-- **Loop dynamics**: number of retries until PASS
-- **Routing dynamics (B/C)**: story points, S/M/L choices, and escalations
+Note: the architecture assumes atomic (single-snippet) tasks — the Developer
+returns a complete solution per task.
 
 ---
 
----
+## Evaluation
+
+See [evaluation.md](evaluation.md) for detailed metrics, analysis plan, and research questions.
