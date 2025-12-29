@@ -4,13 +4,15 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
 from langchain_core.messages import HumanMessage, SystemMessage
-from src.models.llm_responses import PlannerResponse, DeveloperResponse
+from src.models.llm_responses import PlannerResponse, DeveloperResponse, ReviewerResponse
 from src.models.prompts import (
     PLANNER_SYSTEM_PROMPT,
     PLANNER_USER_PROMPT_TEMPLATE,
     DEVELOPER_FIRST_PROMPT,
     DEVELOPER_AFTER_FAILURE,
     SINGLE_AGENT_PROMPT,
+    REVIEWER_SYSTEM_PROMPT,
+    REVIEWER_USER_PROMPT,
 )
 from src.agents.llm import Architecture, get_architecture, get_models
 
@@ -152,6 +154,30 @@ class LLMClient:
             model_name=self.models["baseline"],
             messages=messages,
             response_model=DeveloperResponse,
+            temperature=0.0
+        )
+    
+    def reviewer(self, code: str, task_description: str) -> ReviewerResponse:
+        """
+        Review generated code and provide feedback with improvements.
+        
+        Uses configured reviewer model to analyze code for bugs,
+        edge cases, and style issues.
+        """
+        user_prompt = REVIEWER_USER_PROMPT.format(
+            task_description=task_description,
+            code=code
+        )
+        
+        messages = [
+            {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        return self.invoke_with_structured_output(
+            model_name=self.models["reviewer"],
+            messages=messages,
+            response_model=ReviewerResponse,
             temperature=0.0
         )
 

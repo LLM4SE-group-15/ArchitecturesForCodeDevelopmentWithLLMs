@@ -38,7 +38,8 @@ class GraphState(TypedDict):
     
     # Generated code
     generated_code: Optional[str]
-    reviewed_code: Optional[str]  # Output from Reviewer (future)
+    reviewed_code: Optional[str]      # Improved code from Reviewer
+    reviewer_feedback: Optional[str]  # Feedback from Reviewer
     
     # Test execution (for Tester node)
     test_inputs: list[str]       # stdin inputs for each test case
@@ -75,6 +76,7 @@ def create_initial_state(
         developer_tier=None,
         generated_code=None,
         reviewed_code=None,
+        reviewer_feedback=None,
         test_inputs=test_inputs or [],
         test_outputs=test_outputs or [],
         test_passed=True,

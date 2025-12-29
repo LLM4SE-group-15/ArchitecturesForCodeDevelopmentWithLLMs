@@ -15,4 +15,6 @@ class NodeNames:
     PLANNER = "planner"
     ROUTER = "router"
     DEVELOPER = "developer"
+    REVIEWER = "reviewer"
+    TESTER = "tester"
     SINGLE_AGENT = "single_agent"

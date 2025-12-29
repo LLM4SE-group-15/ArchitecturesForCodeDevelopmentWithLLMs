@@ -88,3 +88,122 @@ def single_agent_node(state: GraphState) -> GraphState:
     state["generated_code"] = response.generated_code
     
     return state
+
+
+def reviewer_node(state: GraphState) -> GraphState:
+    """
+    Reviewer node: reviews generated code and provides improvements.
+    
+    Uses LLM to analyze code for bugs, edge cases, and style issues.
+    """
+    code = state["generated_code"]
+    task_description = state["task_description"]
+    
+    llm_client = get_llm_client()
+    response = llm_client.reviewer(code, task_description)
+    
+    state["reviewed_code"] = response.reviewed_code
+    state["reviewer_feedback"] = response.feedback
+    
+    return state
+
+
+def tester_node(state: GraphState) -> GraphState:
+    """
+    Tester node: executes code with test inputs and validates outputs.
+    
+    This is pure Python logic, not an LLM call.
+    Uses reviewed_code if available, otherwise generated_code.
+    """
+    import subprocess
+    import tempfile
+    import os
+    
+    # Use reviewed code if available, otherwise use generated code
+    code = state["reviewed_code"] or state["generated_code"]
+    test_inputs = state["test_inputs"]
+    test_outputs = state["test_outputs"]
+    
+    if not code:
+        state["test_passed"] = False
+        state["failure_history"].append("No code to test")
+        return state
+    
+    if not test_inputs or not test_outputs:
+        # No tests to run, assume passed
+        state["test_passed"] = True
+        return state
+    
+    all_passed = True
+    errors = []
+    
+    for i, (test_input, expected_output) in enumerate(zip(test_inputs, test_outputs)):
+        success, actual_output, error = _execute_code(code, test_input)
+        
+        if not success:
+            all_passed = False
+            errors.append(f"Test {i+1}: Execution error - {error}")
+            continue
+        
+        # Normalize outputs for comparison (strip whitespace)
+        actual_normalized = actual_output.strip()
+        expected_normalized = expected_output.strip()
+        
+        if actual_normalized != expected_normalized:
+            all_passed = False
+            errors.append(
+                f"Test {i+1}: Expected '{expected_normalized}', got '{actual_normalized}'"
+            )
+    
+    state["test_passed"] = all_passed
+    if errors:
+        state["failure_history"].extend(errors)
+    
+    return state
+
+
+def _execute_code(code: str, stdin_input: str, timeout: int = 10) -> tuple[bool, str, str]:
+    """
+    Execute Python code with given stdin input.
+    
+    Returns:
+        (success, stdout, error_message)
+    """
+    import subprocess
+    import tempfile
+    import os
+    
+    # Write code to temporary file
+    with tempfile.NamedTemporaryFile(
+        mode='w',
+        suffix='.py',
+        delete=False,
+        encoding='utf-8'
+    ) as f:
+        f.write(code)
+        temp_path = f.name
+    
+    try:
+        result = subprocess.run(
+            ['python', temp_path],
+            input=stdin_input,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        
+        if result.returncode != 0:
+            return False, "", result.stderr
+        
+        return True, result.stdout, ""
+        
+    except subprocess.TimeoutExpired:
+        return False, "", f"Timeout after {timeout} seconds"
+    except Exception as e:
+        return False, "", str(e)
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
