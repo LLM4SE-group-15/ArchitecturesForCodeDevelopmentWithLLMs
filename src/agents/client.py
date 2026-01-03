@@ -1,5 +1,7 @@
+import json
 import os
-from typing import Type, TypeVar
+import re
+from typing import TypeVar
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
@@ -43,37 +45,86 @@ class LLMClient:
             max_new_tokens=2048,
         )
         return ChatHuggingFace(llm=llm)
-    
-    def invoke_with_structured_output(
-        self,
-        model_name: str,
-        messages: list[dict],
-        response_model: Type[T],
-        temperature: float = 0.0
-    ) -> T:
-        """
-        Invoke a model with structured output based on a Pydantic model.
-        
-        Args:
-            model_name: HuggingFace model repository ID
-            messages: List of message dicts with 'role' and 'content' keys
-            response_model: Pydantic model class for structured output
-            temperature: Sampling temperature
-            
-        Returns:
-            Structured response matching the response_model type
-        """
-        llm = self._get_llm(model_name, temperature)
-        
+
+    def _to_lc_messages(self, messages: list[dict]) -> list:
         lc_messages = []
         for msg in messages:
             if msg["role"] == "system":
                 lc_messages.append(SystemMessage(content=msg["content"]))
             elif msg["role"] == "user":
                 lc_messages.append(HumanMessage(content=msg["content"]))
-        
-        structured_llm = llm.with_structured_output(response_model)
-        return structured_llm.invoke(lc_messages)
+        return lc_messages
+
+    def _invoke_text(self, model_name: str, messages: list[dict], temperature: float = 0.0) -> str:
+        llm = self._get_llm(model_name, temperature)
+        lc_messages = self._to_lc_messages(messages)
+        result = llm.invoke(lc_messages)
+        return getattr(result, "content", str(result))
+
+    @staticmethod
+    def _extract_first_json_object(text: str) -> dict:
+        """Extract the first JSON object from a model response.
+
+        Models may wrap JSON in markdown fences or add pre/post text.
+        This parser finds the first top-level JSON object using brace balancing
+        while respecting strings and escapes, so it won't get confused by braces
+        inside code strings.
+        """
+        cleaned = text.strip()
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"```\s*$", "", cleaned)
+
+        start = cleaned.find("{")
+        if start == -1:
+            raise ValueError(f"No JSON object found in model output: {text[:2000]}")
+
+        in_string = False
+        escape = False
+        depth = 0
+        end = None
+        for i in range(start, len(cleaned)):
+            ch = cleaned[i]
+            if in_string:
+                if escape:
+                    escape = False
+                    continue
+                if ch == "\\":
+                    escape = True
+                    continue
+                if ch == '"':
+                    in_string = False
+                continue
+
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == "{":
+                depth += 1
+                continue
+            if ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+
+        if end is None:
+            raise ValueError(f"Unterminated JSON object in model output: {text[:2000]}")
+
+        payload = cleaned[start : end + 1]
+        data = json.loads(payload)
+
+        # Small robustness: allow story_points as string digits
+        if isinstance(data, dict) and "story_points" in data and isinstance(data["story_points"], str):
+            sp = data["story_points"].strip()
+            if sp.isdigit():
+                data["story_points"] = int(sp)
+
+        return data
+    
+    # NOTE:
+    # LangChain's `with_structured_output()` typically relies on provider-specific
+    # function calling / tool calling. HuggingFace Inference endpoints used here
+    # do not support that mechanism, so we do manual parsing instead.
     
     def planner(self, task_description: str, task_id: str) -> PlannerResponse:
         """
@@ -89,15 +140,19 @@ class LLMClient:
         
         messages = [
             {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt}
+            {
+                "role": "system",
+                "content": (
+                    "Return ONLY a valid JSON object (no markdown, no code fences, no extra keys). "
+                    "Schema: {id: string, story_points: one of [1,2,3,5,8], rationale: string}."
+                ),
+            },
+            {"role": "user", "content": user_prompt},
         ]
-        
-        return self.invoke_with_structured_output(
-            model_name=self.models["planner"],
-            messages=messages,
-            response_model=PlannerResponse,
-            temperature=0.0
-        )
+
+        text = self._invoke_text(self.models["planner"], messages, temperature=0.0)
+        data = self._extract_first_json_object(text)
+        return PlannerResponse.model_validate(data)
     
     def developer(
         self,
@@ -127,15 +182,24 @@ class LLMClient:
         
         messages = [
             {"role": "system", "content": f"You are a {developer_tier} tier developer."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": (
+                    "Return ONLY a valid JSON object (no markdown, no code fences, no extra keys). "
+                    "Schema: {generated_code: string}. "
+                    "The string must contain the FULL Python solution."
+                ),
+            },
+            {"role": "user", "content": prompt},
         ]
-        
-        return self.invoke_with_structured_output(
-            model_name=self.models["developer_" + developer_tier.lower()],
-            messages=messages,
-            response_model=DeveloperResponse,
-            temperature=0.0
-        )
+
+        text = self._invoke_text(self.models["developer_" + developer_tier.lower()], messages, temperature=0.0)
+        try:
+            data = self._extract_first_json_object(text)
+            return DeveloperResponse.model_validate(data)
+        except Exception:
+            # Fallback: keep pipeline running even if the model ignored JSON format.
+            return DeveloperResponse(generated_code=text.strip())
     
     def single_agent(self, task_description: str) -> DeveloperResponse:
         """
@@ -147,15 +211,23 @@ class LLMClient:
         
         messages = [
             {"role": "system", "content": "You are an expert Python developer."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": (
+                    "Return ONLY a valid JSON object (no markdown, no code fences, no extra keys). "
+                    "Schema: {generated_code: string}. "
+                    "The string must contain the FULL Python solution."
+                ),
+            },
+            {"role": "user", "content": prompt},
         ]
-        
-        return self.invoke_with_structured_output(
-            model_name=self.models["baseline"],
-            messages=messages,
-            response_model=DeveloperResponse,
-            temperature=0.0
-        )
+
+        text = self._invoke_text(self.models["baseline"], messages, temperature=0.0)
+        try:
+            data = self._extract_first_json_object(text)
+            return DeveloperResponse.model_validate(data)
+        except Exception:
+            return DeveloperResponse(generated_code=text.strip())
     
     def reviewer(self, code: str, task_description: str) -> ReviewerResponse:
         """
@@ -171,15 +243,27 @@ class LLMClient:
         
         messages = [
             {"role": "system", "content": REVIEWER_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt}
+            {
+                "role": "system",
+                "content": (
+                    "Return ONLY a valid JSON object (no markdown, no code fences, no extra keys). "
+                    "Schema: {feedback: string, reviewed_code: string}. "
+                    "The reviewed_code must contain the FULL improved Python solution."
+                ),
+            },
+            {"role": "user", "content": user_prompt},
         ]
-        
-        return self.invoke_with_structured_output(
-            model_name=self.models["reviewer"],
-            messages=messages,
-            response_model=ReviewerResponse,
-            temperature=0.0
-        )
+
+        text = self._invoke_text(self.models["reviewer"], messages, temperature=0.0)
+        try:
+            data = self._extract_first_json_object(text)
+            return ReviewerResponse.model_validate(data)
+        except Exception:
+            # Fallback: keep pipeline running even if the model ignored JSON format.
+            return ReviewerResponse(
+                feedback="Model did not return valid JSON per schema.",
+                reviewed_code=text.strip(),
+            )
 
 
 def get_llm_client(architecture: Architecture = None) -> LLMClient:
