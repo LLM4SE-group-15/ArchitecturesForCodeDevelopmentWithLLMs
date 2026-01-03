@@ -73,14 +73,21 @@ TASK:
 PREVIOUS IMPLEMENTATION:
 {generated_code}
 
-ERROR LOG:
+## Reviewer Feedback
+The following feedback was provided by the Reviewer agent during code review:
+{reviewer_feedback}
+
+## Test Errors
+The following errors occurred during test execution:
 {failure_history}
 
 ## Instructions
+- Carefully analyze both the Reviewer feedback and the test errors above.
+- Address all issues identified by the Reviewer.
+- Fix the bugs causing test failures.
 - Write clean, efficient, and well-documented code.
-- Ensure the code meets the requirements outlined in the plan description.
+- Ensure the code meets the requirements outlined in the task description.
 - Consider edge cases and error handling as per the task difficulty.
-- Use the appropriate language and libraries for the task.
 """
 
 SINGLE_AGENT_PROMPT = """You are an expert Python developer. Generate a complete solution for the following task.

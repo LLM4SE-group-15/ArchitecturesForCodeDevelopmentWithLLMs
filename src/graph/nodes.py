@@ -56,6 +56,7 @@ def developer_node(state: GraphState) -> GraphState:
     Developer node: generates code for the task.
     
     Uses the appropriate tier model based on story points and escalation.
+    On retry, receives both failure_history (test errors) and reviewer_feedback.
     """
     plan = state["plan"]
     developer_tier = state["developer_tier"]
@@ -68,7 +69,8 @@ def developer_node(state: GraphState) -> GraphState:
         failure_history="\n".join(state["failure_history"]),
         generated_code=state["generated_code"] or "",
         task_id=plan["id"],
-        test_passed=state["test_passed"]
+        test_passed=state["test_passed"],
+        reviewer_feedback=state["reviewer_feedback"] or ""
     )
     
     state["generated_code"] = response.generated_code

@@ -181,7 +181,8 @@ class LLMClient:
         failure_history: str,
         generated_code: str,
         task_id: str,
-        test_passed: bool
+        test_passed: bool,
+        reviewer_feedback: str = ""
     ) -> DeveloperResponse:
         """
         Generate code for a given plan using the appropriate developer model.
@@ -196,7 +197,8 @@ class LLMClient:
                 story_points=story_points,
                 task_description=plan_description,
                 generated_code=generated_code,
-                failure_history=failure_history
+                failure_history=failure_history,
+                reviewer_feedback=reviewer_feedback or "No feedback available."
             )
         
         messages = [
