@@ -4,7 +4,7 @@ import re
 from typing import TypeVar
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from langchain_huggingface import HuggingFaceEndpoint
+from huggingface_hub import InferenceClient
 from src.models.llm_responses import PlannerResponse, DeveloperResponse, ReviewerResponse
 from src.models.prompts import (
     PLANNER_SYSTEM_PROMPT,
@@ -33,22 +33,17 @@ class LLMClient:
         self.hf_token = os.getenv("HF_TOKEN")
         self.architecture = architecture or get_architecture()
         self.models = get_models(self.architecture)
+        self._client = InferenceClient(token=self.hf_token)
     
-    def _get_llm(self, model_name: str, temperature: float = 0.0) -> HuggingFaceEndpoint:
-        """Get a configured HF text-generation endpoint for the specified model.
-
-        Important: we deliberately avoid chat-completions APIs here because they
-        may route through HuggingFace "Inference Providers" and require extra
-        token permissions (leading to 403 errors).
-        """
-        return HuggingFaceEndpoint(
-            repo_id=model_name,
-            task="text-generation",
-            temperature=temperature,
-            huggingfacehub_api_token=self.hf_token,
-            max_new_tokens=2048,
-            provider="hf-inference",  # Force native HF API to avoid nscale/other provider routing
+    def _invoke_chat(self, model_name: str, messages: list[dict], temperature: float = 0.0) -> str:
+        """Invoke model using chat completion API which handles routing correctly."""
+        response = self._client.chat_completion(
+            model=model_name,
+            messages=messages,
+            max_tokens=2048,
+            temperature=temperature if temperature > 0 else 0.01,  # Avoid exact 0
         )
+        return response.choices[0].message.content
 
     @staticmethod
     def _messages_to_prompt(messages: list[dict]) -> str:
@@ -76,10 +71,8 @@ class LLMClient:
         return f"SYSTEM:\n{system_block}\n\nASSISTANT:\n"
 
     def _invoke_text(self, model_name: str, messages: list[dict], temperature: float = 0.0) -> str:
-        llm = self._get_llm(model_name, temperature)
-        prompt = self._messages_to_prompt(messages)
-        result = llm.invoke(prompt)
-        return str(result)
+        """Invoke model - now uses chat completion API for better compatibility."""
+        return self._invoke_chat(model_name, messages, temperature)
 
     @staticmethod
     def _extract_first_json_object(text: str) -> dict:
