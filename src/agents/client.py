@@ -47,6 +47,7 @@ class LLMClient:
             temperature=temperature,
             huggingfacehub_api_token=self.hf_token,
             max_new_tokens=2048,
+            provider="hf-inference",  # Force native HF API to avoid nscale/other provider routing
         )
 
     @staticmethod
