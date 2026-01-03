@@ -4,8 +4,7 @@ import re
 from typing import TypeVar
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_huggingface import HuggingFaceEndpoint
 from src.models.llm_responses import PlannerResponse, DeveloperResponse, ReviewerResponse
 from src.models.prompts import (
     PLANNER_SYSTEM_PROMPT,
@@ -35,31 +34,51 @@ class LLMClient:
         self.architecture = architecture or get_architecture()
         self.models = get_models(self.architecture)
     
-    def _get_llm(self, model_name: str, temperature: float = 0.0) -> ChatHuggingFace:
-        """Get a configured LLM client for the specified model."""
-        llm = HuggingFaceEndpoint(
+    def _get_llm(self, model_name: str, temperature: float = 0.0) -> HuggingFaceEndpoint:
+        """Get a configured HF text-generation endpoint for the specified model.
+
+        Important: we deliberately avoid chat-completions APIs here because they
+        may route through HuggingFace "Inference Providers" and require extra
+        token permissions (leading to 403 errors).
+        """
+        return HuggingFaceEndpoint(
             repo_id=model_name,
             task="text-generation",
             temperature=temperature,
             huggingfacehub_api_token=self.hf_token,
             max_new_tokens=2048,
         )
-        return ChatHuggingFace(llm=llm)
 
-    def _to_lc_messages(self, messages: list[dict]) -> list:
-        lc_messages = []
+    @staticmethod
+    def _messages_to_prompt(messages: list[dict]) -> str:
+        """Convert system/user messages into a single plain prompt.
+
+        We keep the format intentionally simple and provider-agnostic.
+        """
+        system_parts: list[str] = []
+        user_parts: list[str] = []
         for msg in messages:
-            if msg["role"] == "system":
-                lc_messages.append(SystemMessage(content=msg["content"]))
-            elif msg["role"] == "user":
-                lc_messages.append(HumanMessage(content=msg["content"]))
-        return lc_messages
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if role == "system":
+                system_parts.append(content)
+            elif role == "user":
+                user_parts.append(content)
+
+        system_block = "\n\n".join(system_parts).strip()
+        user_block = "\n\n".join(user_parts).strip()
+
+        if system_block and user_block:
+            return f"SYSTEM:\n{system_block}\n\nUSER:\n{user_block}\n\nASSISTANT:\n"
+        if user_block:
+            return f"USER:\n{user_block}\n\nASSISTANT:\n"
+        return f"SYSTEM:\n{system_block}\n\nASSISTANT:\n"
 
     def _invoke_text(self, model_name: str, messages: list[dict], temperature: float = 0.0) -> str:
         llm = self._get_llm(model_name, temperature)
-        lc_messages = self._to_lc_messages(messages)
-        result = llm.invoke(lc_messages)
-        return getattr(result, "content", str(result))
+        prompt = self._messages_to_prompt(messages)
+        result = llm.invoke(prompt)
+        return str(result)
 
     @staticmethod
     def _extract_first_json_object(text: str) -> dict:

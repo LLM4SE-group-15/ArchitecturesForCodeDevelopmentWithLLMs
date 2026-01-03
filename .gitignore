@@ -52,7 +52,6 @@ outputs/
 
 # Jupyter Notebooks
 .ipynb_checkpoints
-*.ipynb
 
 # OS
 .DS_Store
