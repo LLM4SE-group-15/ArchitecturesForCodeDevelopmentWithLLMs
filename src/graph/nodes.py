@@ -104,7 +104,8 @@ def reviewer_node(state: GraphState) -> GraphState:
     llm_client = get_llm_client()
     response = llm_client.reviewer(code, task_description)
     
-    state["reviewed_code"] = response.reviewed_code
+    # Only save feedback, ignore the rewritten code
+    # state["reviewed_code"] = response.reviewed_code 
     state["reviewer_feedback"] = response.feedback
     
     return state
@@ -121,8 +122,8 @@ def tester_node(state: GraphState) -> GraphState:
     import tempfile
     import os
     
-    # Use reviewed code if available, otherwise use generated code
-    code = state["reviewed_code"] or state["generated_code"]
+    # Use generated code directly (Reviewer is advice-only now)
+    code = state["generated_code"]
     test_inputs = state["test_inputs"]
     test_outputs = state["test_outputs"]
     
