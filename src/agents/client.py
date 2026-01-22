@@ -84,8 +84,16 @@ class LLMClient:
         inside code strings.
         """
         cleaned = text.strip()
+        
+        # Remove markdown fences: ```json, ```, or just "json" prefix
         cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"```\s*$", "", cleaned)
+        # Also handle bare "json" prefix (without backticks) that some models add
+        cleaned = re.sub(r"^json\s*", "", cleaned.strip(), flags=re.IGNORECASE)
+        
+        # Handle Python triple quotes inside JSON (model quirk)
+        # Convert """ to escaped quotes for JSON parsing
+        cleaned = cleaned.replace('"""', '"')
 
         start = cleaned.find("{")
         if start == -1:
@@ -146,14 +154,119 @@ class LLMClient:
     
     @staticmethod
     def _clean_code_string(code: str) -> str:
-        """Removes markdown code fences from a string if present."""
+        """Removes markdown code fences and other artifacts from a string if present."""
         if not code:
             return ""
-        # Remove leading ```python or ``` (case insensitive)
-        code = re.sub(r"^```(?:python)?\s*", "", code.strip(), flags=re.IGNORECASE)
+        
+        code = code.strip()
+        
+        # Handle case where the entire response is wrapped in JSON with "generated_code" key
+        # This happens when model returns nested JSON like: {"generated_code": "...actual code..."}
+        if code.startswith("{") and "generated_code" in code:
+            try:
+                # Remove triple quotes that models sometimes use
+                fixed = code.replace('"""', '"')
+                parsed = json.loads(fixed)
+                if isinstance(parsed, dict) and "generated_code" in parsed:
+                    code = parsed["generated_code"]
+            except (json.JSONDecodeError, KeyError):
+                pass
+        
+        # Remove "json" prefix (model artifact)
+        code = re.sub(r"^json\s*", "", code, flags=re.IGNORECASE)
+        
+        # Remove leading ```python, ```json, or ``` (case insensitive)
+        code = re.sub(r"^```(?:python|json)?\s*", "", code.strip(), flags=re.IGNORECASE)
         # Remove trailing ```
         code = re.sub(r"\s*```$", "", code)
+        
+        # Handle triple quotes that models sometimes use instead of escaped quotes
+        # Only do this if the code starts with triple quotes and contains them
+        if code.startswith('"""') and code.count('"""') >= 2:
+            # Extract content between triple quotes
+            match = re.search(r'^"""(.*?)"""', code, re.DOTALL)
+            if match:
+                code = match.group(1)
+        
         return code.strip()
+
+    @staticmethod
+    def _extract_code_from_response(text: str) -> str:
+        """Extract Python code from a model response using multiple strategies.
+        
+        This is used as a fallback when the model doesn't follow JSON format instructions.
+        """
+        if not text:
+            return ""
+        
+        text = text.strip()
+        
+        # Strategy 1: Try to find code inside markdown code blocks
+        code_block_match = re.search(r"```(?:python)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+        if code_block_match:
+            return code_block_match.group(1).strip()
+        
+        # Strategy 2: Try to extract "generated_code" from JSON-like structure with triple quotes
+        # Pattern: {"generated_code": """..."""}
+        triple_quote_match = re.search(r'"generated_code"\s*:\s*"""(.*?)"""', text, re.DOTALL)
+        if triple_quote_match:
+            return triple_quote_match.group(1).strip()
+        
+        # Strategy 3: Try to extract from regular JSON structure
+        # Pattern: {"generated_code": "..."}
+        try:
+            # Remove "json" prefix if present
+            cleaned = re.sub(r"^json\s*", "", text, flags=re.IGNORECASE)
+            # Handle triple quotes
+            cleaned = cleaned.replace('"""', '"')
+            
+            # Find and parse JSON
+            start = cleaned.find("{")
+            if start != -1:
+                # Try to find matching brace
+                depth = 0
+                for i, ch in enumerate(cleaned[start:], start):
+                    if ch == "{":
+                        depth += 1
+                    elif ch == "}":
+                        depth -= 1
+                        if depth == 0:
+                            json_str = cleaned[start:i+1]
+                            try:
+                                data = json.loads(json_str)
+                                if isinstance(data, dict) and "generated_code" in data:
+                                    return data["generated_code"].strip()
+                            except json.JSONDecodeError:
+                                pass
+                            break
+        except Exception:
+            pass
+        
+        # Strategy 4: Look for Python code patterns - if text looks like Python code, use it
+        # Check if it starts with common Python patterns (after removing artifacts)
+        cleaned_text = re.sub(r"^json\s*", "", text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r"^```(?:python|json)?\s*", "", cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r"\s*```$", "", cleaned_text)
+        
+        # Remove any leading JSON wrapper characters
+        cleaned_text = cleaned_text.strip()
+        if cleaned_text.startswith("{"):
+            # Try to skip past JSON wrapper
+            newline_pos = cleaned_text.find("\n")
+            if newline_pos > 0:
+                rest = cleaned_text[newline_pos:].strip()
+                if rest.startswith('"""'):
+                    # Extract from triple quotes
+                    match = re.search(r'^"""(.*?)"""', rest, re.DOTALL)
+                    if match:
+                        return match.group(1).strip()
+        
+        # Strategy 5: If text contains import statements or def/class, it's likely code
+        if re.search(r'^(import|from|def|class|#)', cleaned_text, re.MULTILINE):
+            return cleaned_text.strip()
+        
+        # Last resort: return cleaned text
+        return cleaned_text.strip()
 
     # NOTE:
     # LangChain's `with_structured_output()` typically relies on provider-specific
@@ -236,9 +349,9 @@ class LLMClient:
             response.generated_code = self._clean_code_string(response.generated_code)
             return response
         except Exception:
-            # Fallback: keep pipeline running even if the model ignored JSON format.
-            # Clean text just in case it's raw code in markdown
-            return DeveloperResponse(generated_code=self._clean_code_string(text))
+            # Fallback: try multiple strategies to extract code
+            extracted_code = self._extract_code_from_response(text)
+            return DeveloperResponse(generated_code=extracted_code)
     
     def single_agent(self, task_description: str) -> DeveloperResponse:
         """
@@ -268,15 +381,9 @@ class LLMClient:
             response.generated_code = self._clean_code_string(response.generated_code)
             return response
         except Exception:
-            # Fallback: if JSON fails, try to extract code from markdown blocks
-            # This handles cases where model returns ```python ... ``` directly
-            code_match = re.search(r"```(?:python)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
-            if code_match:
-                clean_code = code_match.group(1).strip()
-            else:
-                # Use our new cleaner as a final fallback
-                clean_code = self._clean_code_string(text)
-            return DeveloperResponse(generated_code=clean_code)
+            # Fallback: try multiple strategies to extract code
+            extracted_code = self._extract_code_from_response(text)
+            return DeveloperResponse(generated_code=extracted_code)
     
     def reviewer(self, code: str, task_description: str) -> ReviewerResponse:
         """
@@ -310,16 +417,12 @@ class LLMClient:
             response.reviewed_code = self._clean_code_string(response.reviewed_code)
             return response
         except Exception:
-            # Fallback: if JSON fails, try to extract code from markdown blocks
-            code_match = re.search(r"```(?:python)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
-            if code_match:
-                clean_code = code_match.group(1).strip()
-            else:
-                clean_code = self._clean_code_string(text)
+            # Fallback: try multiple strategies to extract code
+            extracted_code = self._extract_code_from_response(text)
             
             return ReviewerResponse(
                 feedback="Model did not return valid JSON per schema.",
-                reviewed_code=clean_code,
+                reviewed_code=extracted_code,
             )
 
 
