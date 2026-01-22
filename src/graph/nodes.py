@@ -148,7 +148,7 @@ def tester_node(state: GraphState) -> GraphState:
             # Truncate error message to avoid context explosion
             safe_error = (error[:1000] + "... [truncated]") if len(error) > 1000 else error
             errors.append(f"Test {i+1}: Execution error - {safe_error}")
-            continue
+            break  # Fail fast! Don't run other tests if code is broken
         
         # Normalize outputs for comparison (strip whitespace)
         actual_normalized = actual_output.strip()
@@ -164,6 +164,7 @@ def tester_node(state: GraphState) -> GraphState:
             errors.append(
                 f"Test {i+1}: Expected '{safe_expected}', got '{safe_actual}'"
             )
+            break  # Fail fast!
     
     state["test_passed"] = all_passed
     if errors:
