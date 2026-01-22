@@ -144,7 +144,9 @@ def tester_node(state: GraphState) -> GraphState:
         
         if not success:
             all_passed = False
-            errors.append(f"Test {i+1}: Execution error - {error}")
+            # Truncate error message to avoid context explosion
+            safe_error = (error[:1000] + "... [truncated]") if len(error) > 1000 else error
+            errors.append(f"Test {i+1}: Execution error - {safe_error}")
             continue
         
         # Normalize outputs for comparison (strip whitespace)
@@ -153,8 +155,13 @@ def tester_node(state: GraphState) -> GraphState:
         
         if actual_normalized != expected_normalized:
             all_passed = False
+            
+            # Truncate outputs to safeguard context window
+            safe_expected = (expected_normalized[:1000] + "... [truncated]") if len(expected_normalized) > 1000 else expected_normalized
+            safe_actual = (actual_normalized[:1000] + "... [truncated]") if len(actual_normalized) > 1000 else actual_normalized
+            
             errors.append(
-                f"Test {i+1}: Expected '{expected_normalized}', got '{actual_normalized}'"
+                f"Test {i+1}: Expected '{safe_expected}', got '{safe_actual}'"
             )
     
     state["test_passed"] = all_passed
