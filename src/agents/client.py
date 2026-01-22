@@ -124,7 +124,17 @@ class LLMClient:
             raise ValueError(f"Unterminated JSON object in model output: {text[:2000]}")
 
         payload = cleaned[start : end + 1]
-        data = json.loads(payload)
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            # Attempt to fix common invalid escape sequences (e.g. LaTeX in text)
+            try:
+                # Regex: match \ that is NOT followed by a valid escape char
+                # Valid JSON escapes: \" \\ \/ \b \f \n \r \t \uXXXX
+                patched = re.sub(r'\\(?![/u"\\bfnrt])', r'\\\\', payload)
+                data = json.loads(patched)
+            except Exception:
+                raise ValueError(f"Unparseable JSON in model output: {text[:2000]}")
 
         # Small robustness: allow story_points as string digits
         if isinstance(data, dict) and "story_points" in data and isinstance(data["story_points"], str):
