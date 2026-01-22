@@ -144,6 +144,17 @@ class LLMClient:
 
         return data
     
+    @staticmethod
+    def _clean_code_string(code: str) -> str:
+        """Removes markdown code fences from a string if present."""
+        if not code:
+            return ""
+        # Remove leading ```python or ``` (case insensitive)
+        code = re.sub(r"^```(?:python)?\s*", "", code.strip(), flags=re.IGNORECASE)
+        # Remove trailing ```
+        code = re.sub(r"\s*```$", "", code)
+        return code.strip()
+
     # NOTE:
     # LangChain's `with_structured_output()` typically relies on provider-specific
     # function calling / tool calling. HuggingFace Inference endpoints used here
@@ -221,10 +232,13 @@ class LLMClient:
         text = self._invoke_text(self.models["developer_" + developer_tier.lower()], messages, temperature=0.0)
         try:
             data = self._extract_first_json_object(text)
-            return DeveloperResponse.model_validate(data)
+            response = DeveloperResponse.model_validate(data)
+            response.generated_code = self._clean_code_string(response.generated_code)
+            return response
         except Exception:
             # Fallback: keep pipeline running even if the model ignored JSON format.
-            return DeveloperResponse(generated_code=text.strip())
+            # Clean text just in case it's raw code in markdown
+            return DeveloperResponse(generated_code=self._clean_code_string(text))
     
     def single_agent(self, task_description: str) -> DeveloperResponse:
         """
@@ -250,7 +264,9 @@ class LLMClient:
         text = self._invoke_text(self.models["baseline"], messages, temperature=0.0)
         try:
             data = self._extract_first_json_object(text)
-            return DeveloperResponse.model_validate(data)
+            response = DeveloperResponse.model_validate(data)
+            response.generated_code = self._clean_code_string(response.generated_code)
+            return response
         except Exception:
             # Fallback: if JSON fails, try to extract code from markdown blocks
             # This handles cases where model returns ```python ... ``` directly
@@ -258,7 +274,8 @@ class LLMClient:
             if code_match:
                 clean_code = code_match.group(1).strip()
             else:
-                clean_code = text.strip()
+                # Use our new cleaner as a final fallback
+                clean_code = self._clean_code_string(text)
             return DeveloperResponse(generated_code=clean_code)
     
     def reviewer(self, code: str, task_description: str) -> ReviewerResponse:
@@ -289,12 +306,20 @@ class LLMClient:
         text = self._invoke_text(self.models["reviewer"], messages, temperature=0.0)
         try:
             data = self._extract_first_json_object(text)
-            return ReviewerResponse.model_validate(data)
+            response = ReviewerResponse.model_validate(data)
+            response.reviewed_code = self._clean_code_string(response.reviewed_code)
+            return response
         except Exception:
-            # Fallback: keep pipeline running even if the model ignored JSON format.
+            # Fallback: if JSON fails, try to extract code from markdown blocks
+            code_match = re.search(r"```(?:python)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+            if code_match:
+                clean_code = code_match.group(1).strip()
+            else:
+                clean_code = self._clean_code_string(text)
+            
             return ReviewerResponse(
                 feedback="Model did not return valid JSON per schema.",
-                reviewed_code=text.strip(),
+                reviewed_code=clean_code,
             )
 
 
