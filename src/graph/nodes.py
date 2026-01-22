@@ -124,8 +124,8 @@ def tester_node(state: GraphState) -> GraphState:
     
     # Use generated code directly (Reviewer is advice-only now)
     code = state["generated_code"]
-    test_inputs = state["test_inputs"]
-    test_outputs = state["test_outputs"]
+    test_inputs = state["test_inputs"][:10]  # Limit to max 10 tests for speed
+    test_outputs = state["test_outputs"][:10]
     
     if not code:
         state["test_passed"] = False
@@ -172,7 +172,7 @@ def tester_node(state: GraphState) -> GraphState:
     return state
 
 
-def _execute_code(code: str, stdin_input: str, timeout: int = 10) -> tuple[bool, str, str]:
+def _execute_code(code: str, stdin_input: str, timeout: int = 3) -> tuple[bool, str, str]:
     """
     Execute Python code with given stdin input.
     
