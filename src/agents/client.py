@@ -252,7 +252,14 @@ class LLMClient:
             data = self._extract_first_json_object(text)
             return DeveloperResponse.model_validate(data)
         except Exception:
-            return DeveloperResponse(generated_code=text.strip())
+            # Fallback: if JSON fails, try to extract code from markdown blocks
+            # This handles cases where model returns ```python ... ``` directly
+            code_match = re.search(r"```(?:python)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+            if code_match:
+                clean_code = code_match.group(1).strip()
+            else:
+                clean_code = text.strip()
+            return DeveloperResponse(generated_code=clean_code)
     
     def reviewer(self, code: str, task_description: str) -> ReviewerResponse:
         """
