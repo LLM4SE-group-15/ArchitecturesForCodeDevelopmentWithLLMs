@@ -25,13 +25,11 @@ ARCHITECTURE_MODELS: dict[Architecture, dict[str, str]] = {
     },
     Architecture.C: {
         # Multi-agent, specialized models per role
-        # Note: Using Qwen2.5-7B-Instruct for planner/reviewer since Meta-Llama models
-        # don't have inference providers configured on HuggingFace serverless API
-        "planner": "Qwen/Qwen2.5-7B-Instruct",        
+        "planner": "meta-llama/Meta-Llama-3-8B-Instruct",        
         "developer_s": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
         "developer_m": "Qwen/Qwen2.5-Coder-7B-Instruct",
         "developer_l": "Qwen/Qwen2.5-Coder-32B-Instruct",
-        "reviewer": "Qwen/Qwen2.5-7B-Instruct",
+        "reviewer": "meta-llama/Meta-Llama-3-8B-Instruct",
     },
 }
 
