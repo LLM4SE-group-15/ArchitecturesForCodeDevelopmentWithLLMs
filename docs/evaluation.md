@@ -59,15 +59,18 @@ This document describes the metrics, comparisons, and analysis to perform at the
 
 ## Dataset
 
-**APPS Dataset** (codeparrot/apps) - 5000 test tasks
+**HumanEval Dataset** (openai/openai_humaneval) - 164 hand-written programming problems
 
-| Difficulty | Count | Description |
-|------------|-------|-------------|
-| introductory | ~1000 | Basic problems (LeetCode Easy) |
-| interview | ~3000 | Interview-level (LeetCode Medium) |
-| competition | ~1000 | Competitive programming (LeetCode Hard) |
+| Feature | Description |
+|---------|-------------|
+| task_id | Unique identifier (e.g., "HumanEval/0") |
+| prompt | Function signature + docstring |
+| test | Assertion-based test code |
+| entry_point | Function name to implement |
+| canonical_solution | Reference solution (not used during generation) |
 
-**Subset for experiments**: Use `load_balanced(per_level=N)` to get equal tasks per difficulty.
+**Testing approach**: Assertion-based testing - the generated code is combined with test assertions and executed.
+
 
 ---
 

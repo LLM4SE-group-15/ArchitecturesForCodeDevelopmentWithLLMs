@@ -1,14 +1,15 @@
 """
-APPS Dataset Task Loader
+HumanEval Dataset Task Loader
 
-Loads coding tasks from the APPS dataset (codeparrot/apps) on HuggingFace.
+Loads coding tasks from the HumanEval dataset (openai/openai_humaneval) on HuggingFace.
 Each task contains:
-- question: Natural language description of the problem
-- input_output: JSON with test inputs (stdin) and expected outputs (stdout)
-- difficulty: "introductory", "interview", or "competition"
+- task_id: Unique identifier (e.g., "HumanEval/0")
+- prompt: Function signature + docstring describing the problem
+- canonical_solution: Reference solution (not used during generation)
+- test: Assertion-based test code
+- entry_point: Name of the function to implement
 """
 
-import json
 from dataclasses import dataclass
 from typing import Optional
 from datasets import load_dataset
@@ -16,181 +17,143 @@ from datasets import load_dataset
 
 @dataclass
 class Task:
-    """Represents a single coding task from the APPS dataset."""
+    """Represents a single coding task from the HumanEval dataset."""
     
-    problem_id: int
-    question: str
-    difficulty: str
-    inputs: list[str]
-    outputs: list[str]
-    starter_code: str = ""
+    task_id: str
+    prompt: str
+    test: str
+    entry_point: str
+    canonical_solution: str = ""
     
     @property
-    def task_id(self) -> str:
-        """Returns task ID as string for use in GraphState."""
-        return f"apps_{self.problem_id}"
+    def question(self) -> str:
+        """Returns the prompt as the task description (for compatibility)."""
+        return self.prompt
     
     def __repr__(self) -> str:
-        return (
-            f"Task(id={self.problem_id}, difficulty={self.difficulty}, "
-            f"tests={len(self.inputs)})"
-        )
+        return f"Task(id={self.task_id}, entry_point={self.entry_point})"
 
 
-class APPSTaskLoader:
+class HumanEvalTaskLoader:
     """
-    Loads and filters tasks from the APPS dataset.
+    Loads tasks from the HumanEval dataset.
     
-    The APPS dataset contains 10,000 coding problems with three difficulty levels:
-    - introductory: Basic programming problems (similar to easy LeetCode)
-    - interview: Standard interview questions (similar to medium LeetCode)
-    - competition: Competitive programming problems (similar to hard LeetCode)
+    The HumanEval dataset contains 164 hand-written programming problems
+    with function signatures, docstrings, and assertion-based tests.
     
     Usage:
-        loader = APPSTaskLoader()
+        loader = HumanEvalTaskLoader()
         
-        # Load 5 tasks per difficulty level (15 total)
-        tasks = loader.load_balanced(per_level=5)
+        # Load all tasks
+        tasks = loader.load_all()
         
-        # Load specific difficulty
-        easy_tasks = loader.load_by_difficulty("introductory", limit=10)
+        # Load specific number of tasks
+        tasks = loader.load_tasks(limit=10)
         
-        # Load single task
-        task = loader.get_task(problem_id=0)
+        # Load single task by ID
+        task = loader.get_task("HumanEval/0")
+        
+        # Load single task by index
+        task = loader.get_task_by_index(0)
     """
     
-    VALID_DIFFICULTIES = {"introductory", "interview", "competition"}
-    
-    def __init__(self, split: str = "test"):
-        """
-        Initialize the task loader.
-        
-        Args:
-            split: Dataset split to use ("train" or "test"). Default is "test".
-                   Both splits contain 5000 samples each.
-        """
-        self.split = split
+    def __init__(self):
+        """Initialize the task loader."""
         self._dataset = None
     
     @property
     def dataset(self):
         """Lazy load the dataset on first access."""
         if self._dataset is None:
-            print(f"Loading APPS dataset ({self.split} split)...")
+            print("Loading HumanEval dataset...")
             self._dataset = load_dataset(
-                "codeparrot/apps",
-                split=self.split,
+                "openai/openai_humaneval",
+                split="test",
                 trust_remote_code=True
             )
             print(f"Loaded {len(self._dataset)} tasks.")
         return self._dataset
     
-    def _parse_task(self, item: dict) -> Optional[Task]:
+    def _parse_task(self, item: dict) -> Task:
         """
         Parse a dataset item into a Task object.
         
         Args:
-            item: Raw dataset item with fields from APPS.
+            item: Raw dataset item with HumanEval fields.
             
         Returns:
-            Task object, or None if parsing fails.
+            Task object.
         """
-        try:
-            # Parse the input_output JSON string
-            io_data = json.loads(item["input_output"])
-            
-            inputs = io_data.get("inputs", [])
-            outputs = io_data.get("outputs", [])
-            
-            # Skip tasks with no test cases
-            if not inputs or not outputs:
-                return None
-            
-            return Task(
-                problem_id=item["problem_id"],
-                question=item["question"],
-                difficulty=item["difficulty"].lower(),
-                inputs=inputs,
-                outputs=outputs,
-                starter_code=item.get("starter_code", "") or ""
-            )
-        except (json.JSONDecodeError, KeyError, TypeError):
-            return None
+        return Task(
+            task_id=item["task_id"],
+            prompt=item["prompt"],
+            test=item["test"],
+            entry_point=item["entry_point"],
+            canonical_solution=item.get("canonical_solution", "")
+        )
     
-    def get_task(self, problem_id: int) -> Optional[Task]:
+    def get_task(self, task_id: str) -> Optional[Task]:
         """
-        Load a specific task by problem ID.
+        Load a specific task by task_id.
         
         Args:
-            problem_id: The problem_id field from the dataset.
+            task_id: The task_id field from the dataset (e.g., "HumanEval/0").
             
         Returns:
-            Task object, or None if not found or parsing fails.
+            Task object, or None if not found.
         """
         for item in self.dataset:
-            if item["problem_id"] == problem_id:
+            if item["task_id"] == task_id:
                 return self._parse_task(item)
         return None
     
-    def load_by_difficulty(
-        self, 
-        difficulty: str, 
-        limit: int = 5,
-        skip_empty_tests: bool = True
-    ) -> list[Task]:
+    def get_task_by_index(self, index: int) -> Optional[Task]:
         """
-        Load tasks filtered by difficulty level.
+        Load a task by dataset index.
         
         Args:
-            difficulty: One of "introductory", "interview", "competition".
+            index: Index in the dataset (0-163).
+            
+        Returns:
+            Task object, or None if index is out of range.
+        """
+        if 0 <= index < len(self.dataset):
+            return self._parse_task(self.dataset[index])
+        return None
+    
+    def load_tasks(self, limit: int = 10, offset: int = 0) -> list[Task]:
+        """
+        Load a subset of tasks.
+        
+        Args:
             limit: Maximum number of tasks to load.
-            skip_empty_tests: Skip tasks that have no test cases.
+            offset: Starting index.
             
         Returns:
             List of Task objects.
         """
-        if difficulty.lower() not in self.VALID_DIFFICULTIES:
-            raise ValueError(
-                f"Invalid difficulty: {difficulty}. "
-                f"Must be one of {self.VALID_DIFFICULTIES}"
-            )
-        
         tasks = []
-        for item in self.dataset:
-            if item["difficulty"].lower() != difficulty.lower():
-                continue
-            
-            task = self._parse_task(item)
-            if task is None and skip_empty_tests:
-                continue
-            
-            if task is not None:
-                tasks.append(task)
-            
-            if len(tasks) >= limit:
-                break
+        end_index = min(offset + limit, len(self.dataset))
+        
+        for i in range(offset, end_index):
+            task = self._parse_task(self.dataset[i])
+            tasks.append(task)
         
         return tasks
     
-    def load_balanced(self, per_level: int = 5) -> list[Task]:
+    def load_all(self) -> list[Task]:
         """
-        Load a balanced set of tasks across all difficulty levels.
+        Load all tasks from the dataset.
         
-        Args:
-            per_level: Number of tasks per difficulty level.
-            
         Returns:
-            List of Task objects (total = per_level * 3).
+            List of all 164 Task objects.
         """
-        tasks = []
-        
-        for difficulty in ["introductory", "interview", "competition"]:
-            level_tasks = self.load_by_difficulty(difficulty, limit=per_level)
-            tasks.extend(level_tasks)
-            print(f"  Loaded {len(level_tasks)} {difficulty} tasks")
-        
-        return tasks
+        return self.load_tasks(limit=len(self.dataset))
     
     def __len__(self) -> int:
         """Return total number of tasks in the dataset."""
         return len(self.dataset)
+
+
+# Alias for backward compatibility
+APPSTaskLoader = HumanEvalTaskLoader

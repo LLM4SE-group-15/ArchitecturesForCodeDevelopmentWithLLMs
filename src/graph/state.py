@@ -18,7 +18,7 @@ class GraphState(TypedDict):
     - Planning output (story points, rationale)
     - Developer routing (tier, escalations)
     - Generated code
-    - Test execution data (inputs, outputs, results)
+    - Test execution data (test code, entry point, results)
     """
     
     # Task metadata
@@ -40,27 +40,27 @@ class GraphState(TypedDict):
     generated_code: Optional[str]
     reviewer_feedback: Optional[str]  # Feedback from Reviewer
     
-    # Test execution (for Tester node)
-    test_inputs: list[str]       # stdin inputs for each test case
-    test_outputs: list[str]      # expected stdout for each test case
-    test_passed: bool            # Whether all tests passed
-    failure_history: list[str]   # Error messages from failed tests
+    # Test execution (for Tester node) - HumanEval style
+    test_code: str                # Assertion-based test code
+    entry_point: str              # Function name to test
+    test_passed: bool             # Whether all tests passed
+    failure_history: list[str]    # Error messages from failed tests
 
 
 def create_initial_state(
     task_id: str,
     task_description: str,
-    test_inputs: list[str] = None,
-    test_outputs: list[str] = None
+    test_code: str = "",
+    entry_point: str = ""
 ) -> GraphState:
     """
     Create the initial state for a graph execution.
     
     Args:
         task_id: Unique identifier for the task
-        task_description: Natural language description of the coding problem
-        test_inputs: List of stdin inputs for test cases
-        test_outputs: List of expected stdout outputs for test cases
+        task_description: The prompt describing the coding problem
+        test_code: Assertion-based test code from HumanEval
+        entry_point: Name of the function to implement
         
     Returns:
         Initialized GraphState ready for workflow execution.
@@ -75,8 +75,8 @@ def create_initial_state(
         developer_tier=None,
         generated_code=None,
         reviewer_feedback=None,
-        test_inputs=test_inputs or [],
-        test_outputs=test_outputs or [],
+        test_code=test_code,
+        entry_point=entry_point,
         test_passed=True,
         failure_history=[],
     )

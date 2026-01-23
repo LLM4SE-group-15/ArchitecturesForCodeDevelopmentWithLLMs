@@ -1,48 +1,56 @@
 import time
-from src.data.task_loader import APPSTaskLoader
+import json
+import logging
+from pathlib import Path
+from src.data.task_loader import HumanEvalTaskLoader
 from src.graph.graph import run_graph
 from src.agents.llm import Architecture
 
-ARCH = Architecture.B
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("humaneval_benchmark")
 
+LOG_DIR = Path("results")
+LOG_DIR.mkdir(exist_ok=True)
+
+ARCH = Architecture.B
 SEED_FIXED = 0
 
-def run_sample_tasks(
-    per_level: int = 5,
-    split: str = "test",
-    difficulties: tuple[str, ...] = ("introductory","interview","competition"),
-    shuffle: bool = True,
-):
-    loader = APPSTaskLoader(split=split)
-    if shuffle:
-        loader._dataset = loader.dataset.shuffle(seed=SEED_FIXED)
 
-    tasks = []
-    for diff in difficulties:
-        tasks.extend(loader.load_by_difficulty(diff, limit=per_level))
+def run_humaneval_benchmark(
+    limit: int = 10,
+    offset: int = 0,
+):
+    """
+    Run benchmark on HumanEval tasks.
+    
+    Args:
+        limit: Number of tasks to run
+        offset: Starting index in the dataset
+    """
+    loader = HumanEvalTaskLoader()
+    tasks = loader.load_tasks(limit=limit, offset=offset)
 
     results = []
     total = len(tasks)
-    logger.info("Loaded %s tasks (%s per difficulty: %s)", total, per_level, ", ".join(difficulties))
+    logger.info("Loaded %s tasks from HumanEval", total)
 
     for idx, task in enumerate(tasks, 1):
-        logger.info("Running %s/%s %s (%s)", idx, total, task.task_id, task.difficulty)
+        logger.info("Running %s/%s %s", idx, total, task.task_id)
         start = time.time()
+        
         state = run_graph(
             task_id=task.task_id,
-            task_description=task.question,
-            test_inputs=task.inputs,
-            test_outputs=task.outputs,
+            task_description=task.prompt,
+            test_code=task.test,
+            entry_point=task.entry_point,
             architecture=ARCH,
         )
-
-        print("State:", state)
-        print()
 
         elapsed = time.time() - start
         record = {
             "task_id": task.task_id,
-            "difficulty": task.difficulty,
+            "entry_point": task.entry_point,
             "architecture": str(ARCH.value),
             "test_passed": state["test_passed"],
             "developer_tier": state.get("developer_tier"),
@@ -52,17 +60,28 @@ def run_sample_tasks(
             "elapsed_seconds": elapsed,
         }
         results.append(record)
+        
+        status = "PASS" if state["test_passed"] else "FAIL"
         logger.info(
-            "Finished %s | pass=%s tier=%s escalations=%s elapsed=%.1fs",
+            "Finished %s | %s | tier=%s escalations=%s elapsed=%.1fs",
             task.task_id,
-            state["test_passed"],
+            status,
             record["developer_tier"],
             record["escalations"],
             elapsed,
         )
-        with open(LOG_DIR / "architecture_B.jsonl", "a", encoding="utf-8") as f:
+        
+        # Save incrementally
+        with open(LOG_DIR / f"humaneval_{ARCH.value}.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
+    
+    # Summary
+    passed = sum(1 for r in results if r["test_passed"])
+    logger.info("Summary: %s/%s passed (%.1f%%)", passed, total, 100 * passed / total if total > 0 else 0)
+    
     return results
 
-sample_results = run_sample_tasks(per_level=5, difficulties=("introductory","interview","competition"), shuffle=True)
-sample_results
+
+if __name__ == "__main__":
+    sample_results = run_humaneval_benchmark(limit=10, offset=0)
+    print(sample_results)

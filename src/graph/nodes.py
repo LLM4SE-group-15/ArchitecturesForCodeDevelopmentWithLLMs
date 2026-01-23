@@ -113,72 +113,49 @@ def reviewer_node(state: GraphState) -> GraphState:
 
 def tester_node(state: GraphState) -> GraphState:
     """
-    Tester node: executes code with test inputs and validates outputs.
+    Tester node: executes generated code with HumanEval assertion tests.
     
     This is pure Python logic, not an LLM call.
-    Uses reviewed_code if available, otherwise generated_code.
+    Combines the generated code with test assertions and runs them.
     """
-    import subprocess
-    import tempfile
-    import os
-    
-    # Use generated code directly (Reviewer is advice-only now)
     code = state["generated_code"]
-    test_inputs = state["test_inputs"][:10]  # Limit to max 10 tests for speed
-    test_outputs = state["test_outputs"][:10]
+    test_code = state["test_code"]
+    entry_point = state["entry_point"]
     
     if not code:
         state["test_passed"] = False
         state["failure_history"].append("No code to test")
         return state
     
-    if not test_inputs or not test_outputs:
+    if not test_code:
         # No tests to run, assume passed
         state["test_passed"] = True
         return state
     
-    all_passed = True
-    errors = []
+    # Combine generated code with test assertions
+    full_code = f"{code}\n\n{test_code}\n\ncheck({entry_point})"
     
-    for i, (test_input, expected_output) in enumerate(zip(test_inputs, test_outputs)):
-        success, actual_output, error = _execute_code(code, test_input)
-        
-        if not success:
-            all_passed = False
-            # Truncate error message to avoid context explosion
-            safe_error = (error[:1000] + "... [truncated]") if len(error) > 1000 else error
-            errors.append(f"Test {i+1}: Execution error - {safe_error}")
-            break  # Fail fast! Don't run other tests if code is broken
-        
-        # Normalize outputs for comparison (strip whitespace)
-        actual_normalized = actual_output.strip()
-        expected_normalized = expected_output.strip()
-        
-        if actual_normalized != expected_normalized:
-            all_passed = False
-            
-            # Truncate outputs to safeguard context window
-            safe_expected = (expected_normalized[:1000] + "... [truncated]") if len(expected_normalized) > 1000 else expected_normalized
-            safe_actual = (actual_normalized[:1000] + "... [truncated]") if len(actual_normalized) > 1000 else actual_normalized
-            
-            errors.append(
-                f"Test {i+1}: Expected '{safe_expected}', got '{safe_actual}'"
-            )
-            break  # Fail fast!
+    success, error = _execute_code_with_tests(full_code)
     
-    state["test_passed"] = all_passed
-    if errors:
-        state["failure_history"].extend(errors)
+    state["test_passed"] = success
+    if not success:
+        # Truncate error message to avoid context explosion
+        safe_error = (error[:1500] + "... [truncated]") if len(error) > 1500 else error
+        state["failure_history"].append(f"Test failed: {safe_error}")
     
     return state
 
 
-def _execute_code(code: str, stdin_input: str, timeout: int = 3) -> tuple[bool, str, str]:
+def _execute_code_with_tests(code: str, timeout: int = 10) -> tuple[bool, str]:
     """
-    Execute Python code with given stdin input.
+    Execute Python code containing function and assertion tests.
     
+    Args:
+        code: Complete Python code with function definition and test assertions
+        timeout: Maximum execution time in seconds
+        
     Returns:
-        (success, stdout, error_message)
+        (success, error_message)
     """
     import subprocess
     import tempfile
@@ -197,24 +174,26 @@ def _execute_code(code: str, stdin_input: str, timeout: int = 3) -> tuple[bool, 
     try:
         result = subprocess.run(
             ['python', temp_path],
-            input=stdin_input,
             capture_output=True,
             text=True,
             timeout=timeout
         )
         
         if result.returncode != 0:
-            return False, "", result.stderr
+            # Combine stderr and stdout for error info
+            error_msg = result.stderr or result.stdout or "Unknown error"
+            return False, error_msg
         
-        return True, result.stdout, ""
+        return True, ""
         
     except subprocess.TimeoutExpired:
-        return False, "", f"Timeout after {timeout} seconds"
+        return False, f"Timeout after {timeout} seconds"
     except Exception as e:
-        return False, "", str(e)
+        return False, str(e)
     finally:
         # Clean up temp file
         try:
             os.unlink(temp_path)
         except:
             pass
+

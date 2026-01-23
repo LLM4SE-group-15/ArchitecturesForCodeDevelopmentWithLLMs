@@ -93,8 +93,8 @@ def build_graph(architecture: Architecture = None) -> StateGraph:
 def run_graph(
     task_id: str,
     task_description: str,
-    test_inputs: list[str] = None,
-    test_outputs: list[str] = None,
+    test_code: str = "",
+    entry_point: str = "",
     architecture: Architecture = None
 ):
     """
@@ -102,9 +102,9 @@ def run_graph(
     
     Args:
         task_id: Unique identifier for the task
-        task_description: Description of the coding task
-        test_inputs: List of stdin inputs for test cases
-        test_outputs: List of expected stdout outputs for test cases
+        task_description: The prompt describing the coding task
+        test_code: Assertion-based test code from HumanEval
+        entry_point: Name of the function to implement
         architecture: Architecture enum (A, B, or C). If None, reads from env.
         
     Returns:
@@ -114,7 +114,8 @@ def run_graph(
     initial_state = create_initial_state(
         task_id=task_id,
         task_description=task_description,
-        test_inputs=test_inputs,
-        test_outputs=test_outputs
+        test_code=test_code,
+        entry_point=entry_point
     )
     return graph.invoke(initial_state)
+
