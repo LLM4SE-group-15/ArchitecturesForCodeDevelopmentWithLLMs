@@ -5,9 +5,10 @@ from typing import Literal
 
 class Architecture(Enum):
     """Experimental architecture configurations."""
-    A = "A"  # Single-agent baseline
-    B = "B"  # Multi-agent, single-model
-    C = "C"  # Multi-agent, multi-model hybrid
+    A = "A"   # Single-agent baseline
+    B = "B"   # Multi-agent, single-model
+    C = "C"   # Multi-agent, multi-model adaptive (routes S/M/L by story points)
+    C1 = "C1" # Multi-agent, multi-model always-L (always uses strongest developer)
 
 
 ARCHITECTURE_MODELS: dict[Architecture, dict[str, str]] = {
@@ -24,10 +25,18 @@ ARCHITECTURE_MODELS: dict[Architecture, dict[str, str]] = {
         "reviewer": "Qwen/Qwen2.5-Coder-7B-Instruct",
     },
     Architecture.C: {
-        # Multi-agent, specialized models per role
+        # Multi-agent, specialized models per role (adaptive routing)
         "planner": "meta-llama/Meta-Llama-3-8B-Instruct",        
         "developer_s": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
         "developer_m": "Qwen/Qwen2.5-Coder-7B-Instruct",
+        "developer_l": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "reviewer": "meta-llama/Meta-Llama-3-8B-Instruct",
+    },
+    Architecture.C1: {
+        # Multi-agent, always uses L tier (same models as C)
+        "planner": "meta-llama/Meta-Llama-3-8B-Instruct",        
+        "developer_s": "Qwen/Qwen2.5-Coder-32B-Instruct",  # All tiers use L model
+        "developer_m": "Qwen/Qwen2.5-Coder-32B-Instruct",  # All tiers use L model
         "developer_l": "Qwen/Qwen2.5-Coder-32B-Instruct",
         "reviewer": "meta-llama/Meta-Llama-3-8B-Instruct",
     },

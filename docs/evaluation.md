@@ -38,22 +38,22 @@ This document describes the metrics, comparisons, and analysis to perform at the
 
 ---
 
-### RQ3 — Effect of Adaptive Routing (C1 vs C2)
+### RQ3 — Effect of Adaptive Routing (C vs C1)
 
-**Comparison**: Within Architecture C
+**Comparison**: Within Architecture C variants
 
+- **C (Adaptive)**: Route by story points (S for easy, M for medium, L for hard)
 - **C1 (Always-Big)**: Always use Developer-L
-- **C2 (Adaptive)**: Route by story points (S for easy, M for medium, L for hard)
 
 **Question**: Can adaptive routing reduce cost (tokens, time) while maintaining or improving quality compared to always using the strongest developer?
 
-| Aspect | C1 (Always-L) | C2 (Adaptive S/M/L) |
+| Aspect | C1 (Always-L) | C (Adaptive S/M/L) |
 |--------|---------------|---------------------|
 | Routing | Always L | Based on story points |
 | Cost | High | Variable (lower average) |
 | Escalation | Never | S→M→L on failure |
 
-**Expected outcome**: C2 should have similar pass rate but lower average cost.
+**Expected outcome**: C should have similar pass rate but lower average cost.
 
 ---
 

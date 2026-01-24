@@ -35,8 +35,20 @@ def router_node(state: GraphState) -> GraphState:
     """
     Router node: routes the task to the appropriate developer.
     
-    On test failure, escalates to a higher tier developer (S -> M -> L).
+    For C1 architecture: Always uses tier L (no adaptive routing).
+    For other architectures: On test failure, escalates S -> M -> L.
     """
+    from src.agents.llm import get_architecture, Architecture
+    
+    arch = get_architecture()
+    
+    # C1 architecture: Always use L tier (bypass adaptive routing)
+    if arch == Architecture.C1:
+        state["developer_tier"] = "L"
+        state["story_points_current"] = 8
+        return state
+    
+    # Normal adaptive routing for B/C
     if not state["test_passed"]:
         developer_tier = state["developer_tier"]
         state["escalations"] += 1
