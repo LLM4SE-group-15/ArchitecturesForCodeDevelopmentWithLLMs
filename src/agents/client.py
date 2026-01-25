@@ -15,7 +15,7 @@ from src.models.prompts import (
     REVIEWER_SYSTEM_PROMPT,
     REVIEWER_USER_PROMPT,
 )
-from src.agents.llm import Architecture, get_architecture, get_models
+from src.agents.llm import Architecture, get_architecture, get_models, get_prompt_repetition
 
 load_dotenv()
 
@@ -29,17 +29,46 @@ class LLMClient:
     Supports architecture-aware model selection for A/B/C experimental setups.
     """
     
-    def __init__(self, architecture: Architecture = None):
+    def __init__(self, architecture: Architecture = None, prompt_repetition: bool = None):
         self.hf_token = os.getenv("HF_TOKEN")
         self.architecture = architecture or get_architecture()
         self.models = get_models(self.architecture)
+        self.prompt_repetition = prompt_repetition if prompt_repetition is not None else get_prompt_repetition()
         self._client = InferenceClient(token=self.hf_token)
+    
+    def _apply_prompt_repetition(self, messages: list[dict]) -> list[dict]:
+        """Apply prompt repetition technique to user messages.
+        
+        Based on: Leviathan et al., "Prompt Repetition Improves Non-Reasoning LLMs"
+        (arXiv:2512.14982, 2025). Repeats user prompt content to allow each token
+        to attend to all other tokens in the prompt.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content' keys.
+            
+        Returns:
+            Modified messages with user content repeated if prompt_repetition is enabled.
+        """
+        if not self.prompt_repetition:
+            return messages
+        
+        repeated_messages = []
+        for msg in messages:
+            if msg["role"] == "user":
+                # Repeat the user content as per the paper's technique
+                repeated_content = f"{msg['content']}\n\n{msg['content']}"
+                repeated_messages.append({"role": "user", "content": repeated_content})
+            else:
+                repeated_messages.append(msg)
+        return repeated_messages
     
     def _invoke_chat(self, model_name: str, messages: list[dict], temperature: float = 0.0) -> str:
         """Invoke model using chat completion API which handles routing correctly."""
+        # Apply prompt repetition if enabled
+        processed_messages = self._apply_prompt_repetition(messages)
         response = self._client.chat_completion(
             model=model_name,
-            messages=messages,
+            messages=processed_messages,
             max_tokens=2048,
             temperature=temperature if temperature > 0 else 0.01,  # Avoid exact 0
         )
@@ -426,6 +455,6 @@ class LLMClient:
             )
 
 
-def get_llm_client(architecture: Architecture = None) -> LLMClient:
-    """Factory function to get LLMClient with specified architecture."""
-    return LLMClient(architecture)
+def get_llm_client(architecture: Architecture = None, prompt_repetition: bool = None) -> LLMClient:
+    """Factory function to get LLMClient with specified architecture and prompt repetition setting."""
+    return LLMClient(architecture, prompt_repetition)

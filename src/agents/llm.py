@@ -55,3 +55,16 @@ def get_models(architecture: Architecture = None) -> dict[str, str]:
     if architecture is None:
         architecture = get_architecture()
     return ARCHITECTURE_MODELS[architecture]
+
+
+def get_prompt_repetition() -> bool:
+    """Get prompt repetition setting from environment variable.
+    
+    Based on: Leviathan et al., "Prompt Repetition Improves Non-Reasoning LLMs"
+    (arXiv:2512.14982, 2025). When enabled, user prompts are repeated to allow
+    each token to attend to all other tokens in the prompt.
+    
+    Returns:
+        True if prompt repetition is enabled, False otherwise (default).
+    """
+    return os.getenv("PROMPT_REPETITION", "false").lower() in ("true", "1", "yes")
