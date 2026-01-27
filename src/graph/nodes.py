@@ -106,18 +106,26 @@ def single_agent_node(state: GraphState) -> GraphState:
 
 def reviewer_node(state: GraphState) -> GraphState:
     """
-    Reviewer node: reviews generated code and provides improvements.
+    Reviewer node: reviews code after testing and provides feedback.
     
-    Uses LLM to analyze code for bugs, edge cases, and style issues.
+    Placed after tester, the reviewer analyzes the generated code along with
+    test results to provide actionable feedback for the next iteration.
+    Does NOT generate any code - only provides feedback on the task.
     """
     code = state["generated_code"]
     task_description = state["task_description"]
+    test_passed = state["test_passed"]
+    failure_history = state["failure_history"]
     
     llm_client = get_llm_client()
-    response = llm_client.reviewer(code, task_description)
+    response = llm_client.reviewer(
+        code=code,
+        task_description=task_description,
+        test_passed=test_passed,
+        failure_history="\n".join(failure_history)
+    )
     
-    # Only save feedback, ignore the rewritten code
-    # state["reviewed_code"] = response.reviewed_code 
+    # Only save feedback - reviewer does not generate code
     state["reviewer_feedback"] = response.feedback
     
     return state

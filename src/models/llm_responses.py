@@ -30,11 +30,7 @@ class DeveloperResponse(BaseModel):
 class ReviewerResponse(BaseModel):
     feedback: str = Field(
         description=(
-            "Code review feedback including: bugs found, edge cases missed, "
-            "style issues, and suggested improvements."
+            "Code review feedback on the task including: analysis of test results, "
+            "bugs found, edge cases missed, and suggestions for improvement."
         )
-    )
-    
-    reviewed_code: str = Field(
-        description="The improved code after applying review feedback."
     )

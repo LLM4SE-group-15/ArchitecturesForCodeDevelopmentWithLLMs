@@ -414,16 +414,24 @@ class LLMClient:
             extracted_code = self._extract_code_from_response(text)
             return DeveloperResponse(generated_code=extracted_code)
     
-    def reviewer(self, code: str, task_description: str) -> ReviewerResponse:
+    def reviewer(
+        self,
+        code: str,
+        task_description: str,
+        test_passed: bool,
+        failure_history: str = ""
+    ) -> ReviewerResponse:
         """
-        Review generated code and provide feedback with improvements.
+        Review code after testing and provide feedback only.
         
-        Uses configured reviewer model to analyze code for bugs,
-        edge cases, and style issues.
+        Uses configured reviewer model to analyze code along with test results.
+        Does NOT generate any code - only provides feedback.
         """
         user_prompt = REVIEWER_USER_PROMPT.format(
             task_description=task_description,
-            code=code
+            code=code,
+            test_passed=test_passed,
+            failure_history=failure_history or "No errors."
         )
         
         messages = [
@@ -432,8 +440,8 @@ class LLMClient:
                 "role": "system",
                 "content": (
                     "Return ONLY a valid JSON object (no markdown, no code fences, no extra keys). "
-                    "Schema: {feedback: string, reviewed_code: string}. "
-                    "The reviewed_code must contain the FULL improved Python solution."
+                    "Schema: {feedback: string}. "
+                    "Provide actionable feedback only - do NOT include any code."
                 ),
             },
             {"role": "user", "content": user_prompt},
@@ -443,15 +451,11 @@ class LLMClient:
         try:
             data = self._extract_first_json_object(text)
             response = ReviewerResponse.model_validate(data)
-            response.reviewed_code = self._clean_code_string(response.reviewed_code)
             return response
         except Exception:
-            # Fallback: try multiple strategies to extract code
-            extracted_code = self._extract_code_from_response(text)
-            
+            # Fallback: use raw text as feedback
             return ReviewerResponse(
-                feedback="Model did not return valid JSON per schema.",
-                reviewed_code=extracted_code,
+                feedback=text.strip() or "Model did not return valid JSON per schema.",
             )
 
 

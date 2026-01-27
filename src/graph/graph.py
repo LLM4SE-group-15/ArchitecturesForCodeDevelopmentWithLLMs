@@ -13,9 +13,9 @@ from src.graph.nodes import (
 from src.agents.llm import Architecture, get_architecture
 
 
-def should_continue_after_tester(state: GraphState) -> str:
+def should_continue_after_reviewer(state: GraphState) -> str:
     """
-    Decide whether to end or retry after testing.
+    Decide whether to end or retry after reviewer provides feedback.
     
     Returns:
         "end" if tests passed or max escalations reached
@@ -61,26 +61,23 @@ def build_graph(architecture: Architecture = None) -> StateGraph:
         graph.add_edge(NodeNames.TESTER, END)
     else:
         # Architecture B/C: Multi-agent pipeline
-        # Task -> Planner -> Router -> Developer -> Reviewer -> Tester -> [conditional]
-        #                      ^                                             |
-        #                      └──────────── (on FAIL) ──────────────────────┘
         graph.add_node(NodeNames.PLANNER, planner_node)
         graph.add_node(NodeNames.ROUTER, router_node)
         graph.add_node(NodeNames.DEVELOPER, developer_node)
         graph.add_node(NodeNames.REVIEWER, reviewer_node)
         graph.add_node(NodeNames.TESTER, tester_node)
         
-        # Linear flow until tester
+        # Linear flow: Developer → Tester → Reviewer
         graph.add_edge(START, NodeNames.PLANNER)
         graph.add_edge(NodeNames.PLANNER, NodeNames.ROUTER)
         graph.add_edge(NodeNames.ROUTER, NodeNames.DEVELOPER)
-        graph.add_edge(NodeNames.DEVELOPER, NodeNames.REVIEWER)
-        graph.add_edge(NodeNames.REVIEWER, NodeNames.TESTER)
+        graph.add_edge(NodeNames.DEVELOPER, NodeNames.TESTER)
+        graph.add_edge(NodeNames.TESTER, NodeNames.REVIEWER)
         
-        # Conditional edge from tester
+        # Conditional edge from reviewer (after reviewing test results)
         graph.add_conditional_edges(
-            NodeNames.TESTER,
-            should_continue_after_tester,
+            NodeNames.REVIEWER,
+            should_continue_after_reviewer,
             {
                 "end": END,
                 "retry": NodeNames.ROUTER
