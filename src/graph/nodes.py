@@ -10,6 +10,8 @@ def planner_node(state: GraphState) -> GraphState:
     Uses a model to evaluate task difficulty
     and assign Scrum-style story points (1-2-3-5-8).
     """
+    from src.agents.llm import get_architecture
+    
     task_id = state["task_id"]
     task_description = state["task_description"]
     
@@ -26,7 +28,15 @@ def planner_node(state: GraphState) -> GraphState:
     state["plan"] = plan
     state["story_points_initial"] = response.story_points
     state["story_points_current"] = response.story_points
-    state["developer_tier"] = get_developer_tier(response.story_points)
+    
+    # Pass architecture to handle C2 ablation (skip S tier)
+    arch = get_architecture()
+    tier = get_developer_tier(response.story_points, arch.value)
+    state["developer_tier"] = tier
+    
+    # For C2: if story points would map to S but we're using M, adjust story_points_current
+    if arch.value == "C2" and response.story_points in (1, 2):
+        state["story_points_current"] = 3  # Minimum for M tier
     
     return state
 
