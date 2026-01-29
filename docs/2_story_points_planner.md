@@ -95,12 +95,12 @@ The Router reads `story_points_current` and selects the developer tier:
 All developer tiers follow the same flow:
 
 ```
-Planner → Router → Developer (S/M/L) → Reviewer → Tester
+Planner → Router → Developer (S/M/L) → Tester → Reviewer
                           ↑                         │
                           └────── (on FAIL) ────────┘
 ```
 
-**Note**: All tiers (S, M, L) pass through the Reviewer. The only difference is the model used by the Developer node.
+**Note**: The Reviewer comes AFTER the Tester. It analyzes test results and provides feedback for the next iteration, but does NOT modify code itself.
 
 ---
 

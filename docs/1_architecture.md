@@ -15,8 +15,8 @@ Task
   → Planner (assign story points to the whole problem)
   → Router (select Developer-S/M/L based on difficulty)
   → Developer (S/M/L) — generates code snippet
-  → Reviewer (code review + suggestions)
   → Tester (non-LLM, runs Python tests)
+  → Reviewer (reviews test results, provides feedback)
   → [PASS] finish | [FAIL] loop with feedback + possible escalation
 ```
 
@@ -51,14 +51,15 @@ Task
              │
              ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                           REVIEWER                            │
-│  Bugs, edge cases, style → feedback + improved code           │
+│                       TESTER (NON-LLM)                        │
+│  Runs Python tests, returns PASS/FAIL + error details         │
 └────────────┬──────────────────────────────────────────────────┘
              │
              ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                       TESTER (NON-LLM)                        │
-│  Execute code with assertions, collect errors                 │
+│                           REVIEWER                            │
+│  Analyzes test results + code, provides feedback for retry    │
+│  Does NOT modify code - only generates actionable feedback    │
 └────────────┬──────────────────────────────────────────────────┘
              │
       ┌──────▼──────────┐
@@ -81,7 +82,7 @@ Task
 | **Developer-S** | Implements code for easy tasks (story points 1-2) |
 | **Developer-M** | Implements code for medium tasks (story points 3-5) or when S fails |
 | **Developer-L** | Implements code for hard tasks (story points 8) or after repeated failures |
-| **Reviewer** | Code review: bugs, edge cases, style, maintainability |
+| **Reviewer** | Analyzes code + test results, provides feedback (no code modification) |
 | **Tester** | Non-LLM: executes Python tests and collects errors |
 
 ### Story Points → Developer Tier Mapping
@@ -124,13 +125,13 @@ graph.add_node("tester", tester_node)
 graph.add_edge(START, "planner")
 graph.add_edge("planner", "router")
 graph.add_edge("router", "developer")
-graph.add_edge("developer", "reviewer")
-graph.add_edge("reviewer", "tester")
+graph.add_edge("developer", "tester")
+graph.add_edge("tester", "reviewer")
 
-# Conditional edge for retry
+# Conditional edge from reviewer (decides retry or end)
 graph.add_conditional_edges(
-    "tester",
-    should_continue_after_tester,
+    "reviewer",
+    should_continue_after_reviewer,
     {
         "end": END,
         "retry": "router"
@@ -204,8 +205,8 @@ Task
   → Planner (Qwen-7B)
   → Router (selects S/M/L, but all map to Qwen-7B)
   → Developer (Qwen-7B)
-  → Reviewer (Qwen-7B)
   → Tester
+  → Reviewer (Qwen-7B)
   → [FAIL] correction loop (Qwen-7B)
 ```
 
@@ -232,8 +233,8 @@ Task
   → Planner (Llama-8B)
   → Router (uses story points + failure history)
   → Developer-S/M/L (Qwen 1.5B/7B/32B)
-  → Reviewer (Llama-8B)
   → Tester
+  → Reviewer (Llama-8B)
   → [FAIL] loop + story point escalation + reroute to stronger developer
 ```
 

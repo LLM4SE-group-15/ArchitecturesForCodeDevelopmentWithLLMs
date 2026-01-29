@@ -10,12 +10,12 @@ This document describes the metrics, comparisons, and analysis to perform at the
 
 **Comparison**: Architecture A vs Architecture B (same model: Qwen-7B)
 
-**Question**: Does introducing a multi-agent pipeline (Planner → Developer → Reviewer → Tester) improve code correctness compared to a single-agent approach?
+**Question**: Does introducing a multi-agent pipeline (Planner → Developer → Tester → Reviewer) improve code correctness compared to a single-agent approach?
 
 | Aspect | A (Single-Agent) | B (Multi-Agent) |
 |--------|------------------|-----------------|
 | Model | Qwen-7B | Qwen-7B (all roles) |
-| Pipeline | Single call | Planner → Router → Developer → Reviewer → Tester |
+| Pipeline | Single call | Planner → Router → Developer → Tester → Reviewer |
 | Retry | No | Yes (on test failure) |
 
 ---
@@ -52,6 +52,8 @@ This document describes the metrics, comparisons, and analysis to perform at the
 ---
 
 ### RQ4 — Effect of Prompt Repetition (A/B/C vs A-PR/B-PR/C-PR)
+
+PAPER: https://arxiv.org/abs/2512.14982 
 
 **Comparison**: Each architecture with and without prompt repetition
 
@@ -149,14 +151,79 @@ Implement the following function:\n\ndef add(a, b):\n    ..."
 | **Story Point Accuracy** | Correlation between Planner's estimate and actual task difficulty |
 | **Tier Distribution** | Percentage of tasks routed to S/M/L |
 
-### Code Quality Metrics (Optional)
+### Static Code Quality Metrics
 
-| Metric | Tool | Description |
-|--------|------|-------------|
-| **Cyclomatic Complexity** | Radon | Code complexity measure |
-| **Maintainability Index** | Radon | Maintainability score (0-100) |
-| **Lines of Code** | — | Code length |
-| **Pylint Score** | Pylint | Code quality score (0-10) |
+Static code quality metrics are computed for all generated code using **Radon**, a Python library for code analysis. These metrics evaluate code quality independently of functional correctness.
+
+#### Cyclomatic Complexity (CC)
+
+**Definition**: Cyclomatic Complexity measures the number of linearly independent paths through a program's source code. It quantifies the structural complexity of code based on control flow.
+
+**Formula**: `CC = E - N + 2P`
+
+Where:
+- `E` = Number of edges in the control flow graph
+- `N` = Number of nodes in the control flow graph
+- `P` = Number of connected components (usually 1 for a single function)
+
+**Interpretation Scale (lower is better)**:
+
+| CC Range | Risk Assessment | Description |
+|----------|-----------------|-------------|
+| 1-5 | Low | Simple, well-structured code |
+| 6-10 | Moderate | Moderately complex, acceptable |
+| 11-20 | High | Complex, harder to test |
+| 21+ | Very High | Untestable, high maintenance risk |
+
+**What contributes to CC**:
+- Each `if`, `elif`, `for`, `while`, `except`, `with`, `assert`, `and`, `or` adds +1
+- Each function starts with CC = 1
+
+**Implementation**: Computed using `radon.complexity.cc_visit()` for each function in the generated code. The average CC across all functions is reported.
+
+#### Maintainability Index (MI)
+
+**Definition**: The Maintainability Index is a composite metric that estimates how maintainable the source code is. Higher values indicate more maintainable code.
+
+**Formula**:
+
+```
+MI = max(0, 100 * (171 - 5.2 * ln(HV) - 0.23 * CC - 16.2 * ln(LOC)) / 171)
+```
+
+Where:
+- `HV` = Halstead Volume (based on operators and operands)
+- `CC` = Cyclomatic Complexity
+- `LOC` = Lines of Code
+
+**Interpretation Scale (0-100, higher is better)**:
+
+| MI Range | Maintainability | Description |
+|----------|-----------------|-------------|
+| 0-9 | Very Low | Extremely difficult to maintain |
+| 10-19 | Low | Difficult to maintain |
+| 20-39 | Moderate | Moderately maintainable |
+| 40-64 | Good | Reasonably maintainable |
+| 65-84 | High | Easy to maintain |
+| 85-100 | Very High | Excellent maintainability |
+
+**Implementation**: Computed using `radon.metrics.mi_visit()` which returns the MI score for the entire code block.
+
+#### Metrics Summary Table
+
+| Metric | Tool | Direction | Description |
+|--------|------|-----------|-------------|
+| **Cyclomatic Complexity** | Radon | Lower is better | Number of independent paths through code |
+| **Maintainability Index** | Radon | Higher is better | Composite maintainability score (0-100) |
+| **Lines of Code** | — | Contextual | Total lines of generated code |
+
+#### Analysis: Passed vs Failed Tasks
+
+The static metrics are computed separately for passed and failed tasks to investigate whether code quality correlates with functional correctness. This analysis helps answer:
+
+- Do failed tasks exhibit higher complexity?
+- Is there a maintainability threshold that predicts success?
+- Does the multi-agent pipeline produce more maintainable code than single-agent?
 
 ---
 
@@ -188,7 +255,10 @@ For each task execution, log the following JSON record:
     "generated_code": "...",
     "reviewed_code": "...",
     "reviewer_feedback": "...",
-    "failure_history": ["AssertionError: expected 5, got 4"]
+    "failure_history": ["AssertionError: expected 5, got 4"],
+    
+    "cyclomatic_complexity": 4.0,
+    "maintainability_index": 75.51
 }
 ```
 
@@ -264,6 +334,36 @@ Compare Planner's story points vs actual task outcome:
 
 **Visualization**: Box plot or violin plot
 
+### 7. Static Code Quality Analysis
+
+Compare Cyclomatic Complexity and Maintainability Index across architectures and task outcomes:
+
+| Architecture | Avg CC | Median CC | Max CC | Avg MI | Median MI | Min MI |
+|--------------|--------|-----------|--------|--------|-----------|--------|
+| A | | | | | | |
+| A-PR | | | | | | |
+| B | | | | | | |
+| B-PR | | | | | | |
+| C | | | | | | |
+| C-PR | | | | | | |
+
+**Comparison: Passed vs Failed Tasks**
+
+| Task Outcome | Avg CC | Avg MI | Count |
+|--------------|--------|--------|-------|
+| Passed | | | |
+| Failed | | | |
+
+**Analysis Questions**:
+- Does lower CC correlate with higher pass rates?
+- Do multi-agent architectures produce more maintainable code (higher MI)?
+- Is there a significant difference in code quality between passed and failed tasks?
+
+**Visualization**: 
+- Violin plot of CC distribution by architecture
+- Scatter plot: MI vs Pass Rate
+- Box plot comparing CC/MI for passed vs failed tasks
+
 ---
 
 ## Statistical Tests
@@ -274,6 +374,10 @@ Compare Planner's story points vs actual task outcome:
 | Pass Rate (unpaired) | Chi-square test | Compare A vs B vs C |
 | Cost Comparison | Mann-Whitney U / Wilcoxon | Compare distributions |
 | Effect Size | Cohen's d / Cliff's delta | Measure magnitude of difference |
+| CC: Passed vs Failed | Mann-Whitney U | Compare complexity between passed/failed tasks |
+| MI: Passed vs Failed | Mann-Whitney U | Compare maintainability between passed/failed tasks |
+| CC: Across Architectures | Kruskal-Wallis | Compare CC distributions across A/B/C |
+| MI: Across Architectures | Kruskal-Wallis | Compare MI distributions across A/B/C |
 
 ---
 
