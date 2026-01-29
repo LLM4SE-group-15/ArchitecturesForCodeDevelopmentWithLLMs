@@ -1,11 +1,16 @@
 import json
+import logging
 import os
 import re
+import time
 from typing import TypeVar
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from huggingface_hub import InferenceClient
+from huggingface_hub.utils import HfHubHTTPError
 from src.models.llm_responses import PlannerResponse, DeveloperResponse, ReviewerResponse
+
+logger = logging.getLogger(__name__)
 from src.models.prompts import (
     PLANNER_SYSTEM_PROMPT,
     PLANNER_USER_PROMPT_TEMPLATE,
@@ -63,16 +68,41 @@ class LLMClient:
         return repeated_messages
     
     def _invoke_chat(self, model_name: str, messages: list[dict], temperature: float = 0.0) -> str:
-        """Invoke model using chat completion API which handles routing correctly."""
+        """Invoke model using chat completion API with retry logic for transient errors.
+        
+        Implements exponential backoff retry for 502/503 errors from HuggingFace Inference API.
+        """
         # Apply prompt repetition if enabled
         processed_messages = self._apply_prompt_repetition(messages)
-        response = self._client.chat_completion(
-            model=model_name,
-            messages=processed_messages,
-            max_tokens=2048,
-            temperature=temperature if temperature > 0 else 0.01,  # Avoid exact 0
-        )
-        return response.choices[0].message.content
+        
+        max_retries = 5
+        base_delay = 5  # seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                response = self._client.chat_completion(
+                    model=model_name,
+                    messages=processed_messages,
+                    max_tokens=2048,
+                    temperature=temperature if temperature > 0 else 0.01,  # Avoid exact 0
+                )
+                return response.choices[0].message.content
+            except HfHubHTTPError as e:
+                # Check if it's a retryable error (502, 503)
+                error_str = str(e)
+                is_retryable = "503" in error_str or "502" in error_str or "Service Temporarily Unavailable" in error_str
+                
+                if is_retryable and attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)  # Exponential backoff: 5, 10, 20, 40, 80
+                    logger.warning(
+                        f"HuggingFace API error (attempt {attempt + 1}/{max_retries + 1}): {error_str[:100]}... "
+                        f"Retrying in {delay}s"
+                    )
+                    time.sleep(delay)
+                else:
+                    # Either not retryable or exhausted retries
+                    logger.error(f"HuggingFace API error after {attempt + 1} attempts: {error_str[:200]}")
+                    raise
 
     @staticmethod
     def _messages_to_prompt(messages: list[dict]) -> str:
