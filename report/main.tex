@@ -1,0 +1,120 @@
+\documentclass[11pt]{article}
+
+% ACL style
+\usepackage{acl}
+
+% =============================================================================
+% PACKAGES
+% =============================================================================
+
+% Typography
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+
+% Graphics and Tables
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+
+% Math
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Hyperlinks (ACL style: dark blue, no boxes)
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor={blue!80!black},
+    citecolor={blue!80!black},
+    urlcolor={blue!80!black}
+}
+
+% Code listings (optional, for code snippets)
+\usepackage{listings}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    language=Python
+}
+
+% =============================================================================
+% METADATA
+% =============================================================================
+
+\title{Multi-Agent Architectures for LLM-Based Code Generation: \\
+       An Empirical Comparison of Orchestration Strategies}
+
+% Authors
+\author{
+    \textbf{Ivan Necerini} \\
+    s345147
+    \And
+    \textbf{Jacopo Rialti} \\
+    s346357
+    \And
+    \textbf{Emanuele Romano} \\
+    s346325
+    \AND
+    \textbf{Marco Donatucci} \\
+    s337624
+    \And
+    \textbf{Ferdinando Del Vecchio} \\
+    s347426
+}
+
+% =============================================================================
+% DOCUMENT
+% =============================================================================
+
+\begin{document}
+\maketitle
+
+% -----------------------------------------------------------------------------
+% ABSTRACT
+% -----------------------------------------------------------------------------
+\input{sections/00_abstract}
+
+% -----------------------------------------------------------------------------
+% INTRODUCTION
+% -----------------------------------------------------------------------------
+\input{sections/01_introduction}
+
+% -----------------------------------------------------------------------------
+% BACKGROUND / RELATED WORK
+% -----------------------------------------------------------------------------
+\input{sections/02_system_overview.tex}
+
+% -----------------------------------------------------------------------------
+% SYSTEM OVERVIEW / METHODOLOGY
+% -----------------------------------------------------------------------------
+\input{sections/03_experimental_setup.tex}
+
+% -----------------------------------------------------------------------------
+% EXPERIMENTAL RESULTS
+% -----------------------------------------------------------------------------
+\input{sections/04_experimental_results.tex}
+
+% -----------------------------------------------------------------------------
+% CONCLUSION
+% -----------------------------------------------------------------------------
+\input{sections/05_conclusion.tex}
+
+% -----------------------------------------------------------------------------
+% REFERENCES
+% -----------------------------------------------------------------------------
+\nocite{*}  % Include all references (remove this line when adding real citations)
+\bibliography{references}
+
+% -----------------------------------------------------------------------------
+% APPENDIX (optional)
+% -----------------------------------------------------------------------------
+% \appendix
+% \input{sections/appendix}
+
+\end{document}

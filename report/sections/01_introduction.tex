@@ -1,0 +1,19 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Large Language Models (LLMs) have demonstrated remarkable capabilities in code generation, enabling developers to produce functional software from natural language specifications. However, single-prompt interactions often fail on complex development tasks that require multi-step reasoning, iterative refinement, or careful handling of edge cases. This limitation has motivated the exploration of multi-agent architectures that decompose the software development process into specialized roles, potentially improving both code quality and functional correctness.
+
+Multi-agent systems for code generation typically assign distinct responsibilities to different agents---such as planning, implementation, testing, and review---mirroring established software engineering practices. While this approach is conceptually appealing, the empirical benefits of such architectures remain underexplored. Key questions include whether the overhead of agent coordination is justified by quality improvements, whether specialized models for each role outperform a single model serving all roles, and whether adaptive strategies can reduce computational costs without sacrificing correctness.
+
+This work presents a systematic empirical comparison of LLM-based code generation architectures, ranging from single-agent baselines to multi-agent pipelines with adaptive model routing. We implement and evaluate three primary architectures: (A) a single-agent baseline, (B) a multi-agent pipeline using a single model for all roles, and (C) a multi-agent pipeline with specialized models per role and adaptive routing based on task difficulty estimation. Additionally, we investigate the effect of prompt repetition, a recently proposed technique for improving non-reasoning LLMs~\cite{leviathan2025prompt}, on code generation accuracy across all architectures.
+
+Our evaluation is conducted on the HumanEval benchmark~\cite{chen2021humaneval}, comprising 164 hand-written programming problems with assertion-based tests. We address the following research questions:
+
+\begin{itemize}
+    \item \textbf{RQ1}: Does a multi-agent pipeline with role separation (Planner, Developer, Tester, Reviewer) improve functional correctness compared to a single-agent approach?
+    \item \textbf{RQ2}: Do specialized models assigned to each role provide measurable benefits over using a single model for all roles?
+    \item \textbf{RQ3}: Can adaptive routing---selecting developer model capacity based on estimated task difficulty---reduce computational cost while maintaining or improving quality?
+    \item \textbf{RQ4}: Does prompt repetition improve code generation accuracy for the models used in this study?
+\end{itemize}
+
+The contributions of this work include: (1) a reproducible multi-agent framework for code generation using LangGraph, (2) an empirical comparison of single-agent versus multi-agent architectures on standardized benchmarks, (3) an analysis of adaptive model routing based on Scrum-style story point estimation, and (4) an evaluation of prompt repetition effects in the context of code generation.

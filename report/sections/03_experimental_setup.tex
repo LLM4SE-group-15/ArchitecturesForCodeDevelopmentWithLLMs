@@ -1,0 +1,44 @@
+\section{Experimental Setup}
+\label{sec:experimental_setup}
+
+This section describes the dataset, execution environment, evaluation metrics, and experimental configurations used in our study.
+
+% -----------------------------------------------------------------------------
+\subsection{Dataset}
+\label{subsec:dataset}
+
+We evaluate all architectures on the HumanEval benchmark~\cite{chen2021humaneval}, a widely-used dataset for assessing code generation capabilities of large language models. HumanEval consists of 164 hand-written Python programming problems, each comprising a function signature with docstring, a set of assertion-based tests, and a reference solution (not used during generation).
+
+Each task is structured as follows: the \texttt{prompt} field contains the function signature and docstring describing the expected behavior; the \texttt{test} field contains Python assertions that validate the implementation; and the \texttt{entry\_point} field specifies the function name to be implemented. This structure enables automated evaluation through assertion-based testing, where generated code is concatenated with test assertions and executed in a sandboxed subprocess with a timeout of 5 seconds.
+
+HumanEval was chosen for several reasons: it provides a controlled benchmark with diverse problem types ranging from simple string manipulation to algorithmic challenges; it uses assertion-based testing which yields unambiguous pass/fail outcomes; and it is widely adopted in the literature, facilitating comparison with prior work.
+
+% -----------------------------------------------------------------------------
+\subsection{Execution Environment}
+\label{subsec:environment}
+
+All experiments were conducted on Kaggle Notebooks, a cloud-based computational platform providing reproducible execution environments. This choice ensures that experiments can be replicated without requiring local GPU resources.
+
+Language models were accessed through the HuggingFace Inference API, which provides serverless endpoints for model inference. This approach offers several advantages: it eliminates the need for local model deployment, provides consistent inference performance, and enables access to models of varying sizes (1.5B to 32B parameters) without hardware constraints.
+
+% -----------------------------------------------------------------------------
+\subsection{Evaluation Metrics}
+\label{subsec:metrics}
+
+We employ four categories of metrics to comprehensively evaluate the architectures.
+
+\paragraph{Primary Metrics.} The primary measure of functional correctness is the \textbf{Pass Rate}, defined as the percentage of tasks where all test assertions pass. We also report \textbf{Pass@1}, which measures correctness on the first generation attempt---for Architecture A this equals the pass rate, while for multi-agent architectures it reflects success before any retry or escalation. To quantify uncertainty, we compute \textbf{95\% confidence intervals} using the Wilson score interval for binomial proportions.
+
+\paragraph{Cost Metrics.} To assess computational efficiency, we measure \textbf{Total Tokens} (sum of input and output tokens per task), \textbf{API Calls} (number of LLM invocations per task), and \textbf{Execution Time} (end-to-end wall-clock time per task in seconds). These metrics enable cost-benefit analysis of multi-agent overhead.
+
+\paragraph{Adaptive Metrics.} For architectures employing the multi-agent pipeline (B, C, C1, C2), we track additional metrics specific to the adaptive mechanisms. \textbf{Retry Count} measures the number of Developer$\rightarrow$Tester$\rightarrow$Reviewer loops executed until success or final failure. \textbf{Escalation Count} tracks the number of tier transitions (S$\rightarrow$M or M$\rightarrow$L) triggered by test failures. \textbf{Story Point Accuracy} evaluates the correlation between the Planner's difficulty estimate and actual task outcome. \textbf{Tier Distribution} reports the percentage of tasks routed to each developer tier (S/M/L).
+
+\paragraph{Static Code Quality Metrics.} Beyond functional correctness, we assess the quality of generated code using static analysis. \textbf{Cyclomatic Complexity (CC)} measures the number of linearly independent paths through the code, computed using the Radon library. Lower values indicate simpler, more testable code (1--5: simple, 6--10: moderate, 11+: complex). \textbf{Maintainability Index (MI)} is a composite metric incorporating Halstead Volume, cyclomatic complexity, and lines of code, with values ranging from 0 to 100 (higher indicates better maintainability). These metrics are computed for all generated solutions, enabling analysis of whether multi-agent pipelines produce more maintainable code.
+
+% -----------------------------------------------------------------------------
+\subsection{Experimental Configuration}
+\label{subsec:configuration}
+
+We evaluate eight architectural configurations, as summarized in Table~\ref{tab:model_config}. Architectures A and A-PR represent single-agent baselines with and without prompt repetition. Architectures B and B-PR employ the full multi-agent pipeline with a single model for all roles. Architectures C and C-PR use specialized models with adaptive routing based on story points. Architecture C1 always uses the largest developer model regardless of difficulty estimate, serving as an upper-bound reference. Architecture C2 is an ablation study that removes the smallest developer tier.
+
+Each configuration was evaluated on all 164 HumanEval tasks. For multi-agent architectures, a maximum of two escalations was permitted before terminating the pipeline. All prompt repetition variants (A-PR, B-PR, C-PR) apply the repetition technique to user prompts only, leaving system prompts unchanged.
