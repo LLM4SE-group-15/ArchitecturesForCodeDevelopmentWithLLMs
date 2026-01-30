@@ -32,6 +32,19 @@
 
 ---
 
+## API Calls Metrics
+
+| Architecture | Average API Calls per Task | Total API Calls |
+|--------------|----------------------------|-----------------|
+| architecture-a | 1.00 | 164 |
+| architecture-b | 4.33 | 710 |
+| architecture-c | 4.85 | 796 |
+| architecture-c1 | 3.00 | 492 |
+
+*Note: Prompt Repetition (-PR) variants have the same API call counts as their base architectures.*
+
+---
+
 ## Escalation Analysis
 
 | Architecture | 0 Esc | 0 Esc Pass% | 1 Esc | 1 Esc Pass% | 2 Esc | 2 Esc Pass% | Total Esc |
