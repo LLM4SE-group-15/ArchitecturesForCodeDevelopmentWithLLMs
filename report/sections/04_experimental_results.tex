@@ -142,7 +142,7 @@ To further investigate the role of the smallest model, we conducted an ablation 
     }
 \end{table}
 
-Architecture C2 achieved a pass rate of \textbf{72.0\%}, a substantial improvement of 9.8 percentage points over C. The removal of Tier S reduced total escalations from 152 to 74 and decreased average execution time from 19.28s to 13.32s. This confirms that the Qwen-1.5B model (Tier S) was the primary bottleneck in the adaptive configuration---its consistent failures triggered cascading escalations that consumed resources and polluted the context for subsequent attempts.
+Architecture C2 achieved a pass rate of \textbf{72.0\%}, a substantial improvement of 9.8 percentage points over C. The removal of Tier S reduced total escalations from 152 to 74 and decreased average execution time from 19.28s to 13.32s. This confirms that the Qwen-1.5B model (Tier S) was the primary bottleneck in the adaptive configuration, its consistent failures triggered cascading escalations that consumed resources and polluted the context for subsequent attempts.
 
 % -----------------------------------------------------------------------------
 \subsection{RQ4: Effect of Prompt Repetition}
@@ -227,8 +227,9 @@ Table~\ref{tab:tier_distribution} shows the final tier assignment for each archi
 In Architecture C, no tasks completed at Tier S, all initially routed S-tier tasks escalated. This confirms that the Qwen-1.5B model is inadequate for this code generation framework. Notably, the Tier L pass rate in Architecture C (42.1\%) is much lower than in C1 (81.7\%), indicating that accumulated errors from prior failed attempts may have polluted the context for subsequent generations.
 
 \paragraph{Story Point Accuracy.}
-The Planner's story point estimates showed limited predictive power. In Architecture C1, tasks assigned SP=1-2 (trivial) achieved 86--100\% pass rates, while SP=8 (hard) tasks achieved only 50\%. This suggests the Planner's difficulty estimates have some validity, but the benefit of adaptive routing was negated by the weakness of smaller-tier models.
+The Planner's story point estimates demonstrated meaningful predictive validity. In Architecture C1, which uses the same large model for all tasks regardless of estimated difficulty, tasks assigned SP=1--2 (trivial) achieved 86--100\% pass rates, while SP=8 (hard) tasks achieved only 50\%. This correlation confirms that the Planner correctly identifies task difficulty, as genuinely harder problems yield lower success rates even when processed by the strongest available model.
 
+However, a separate concern emerges when comparing Architecture A's Pass Rate (67.7\%) with Architecture B's Pass@1 (50.6\%). In Architecture A, the model receives the raw HumanEval task description directly. In Architecture B, the same task description is first processed by the Planner, which adds story point estimates and structured reasoning before forwarding it to the Developer. Despite this additional context, B's first-attempt success rate is substantially lower than A's single-shot performance. This suggests that the Planner's augmented output may introduce noise or dilute the original task specification, making it harder for the Developer to focus on the core problem. While the multi-agent pipeline ultimately recovers through its retry mechanism (reaching 72.6\% final pass rate), the Planner's contribution to first-attempt success appears counterproductive.
 % -----------------------------------------------------------------------------
 \subsection{Static Code Quality Analysis}
 \label{subsec:code_quality}
