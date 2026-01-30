@@ -78,4 +78,6 @@ htmlcov/
 *.nav
 *.snm
 *.vrb
+*.run.xml
+*-blx.bib
 
