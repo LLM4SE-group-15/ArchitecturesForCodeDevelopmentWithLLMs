@@ -1,2 +1,16 @@
 \section{Conclusion}
 \label{sec:conclusion}
+
+This work presented a systematic empirical comparison of LLM-based code generation architectures, investigating the effects of multi-agent orchestration, model specialization, adaptive routing, and prompt repetition on functional correctness and code quality.
+
+\paragraph{Summary of Contributions.}
+We developed a reproducible multi-agent framework using LangGraph that implements role separation across Planner, Developer, Tester, and Reviewer agents. We conducted a comprehensive evaluation on the HumanEval benchmark comparing single-agent baselines with multi-agent pipelines of varying complexity. We introduced an adaptive routing mechanism based on Scrum-style story point estimation, and evaluated the prompt repetition technique in the context of code generation.
+
+\paragraph{Key Findings.}
+Our experiments yielded several insights. First, multi-agent orchestration with an iterative review loop improves functional correctness over single-agent approaches, achieving a 4.9 percentage point improvement (72.6\% vs 67.7\%) when using the same underlying model. The self-correction mechanism successfully recovered 22\% of initially failing tasks. Second, model specialization with adaptive routing underperformed compared to a single-model configuration when the smallest tier model (1.5B parameters) proved insufficiently capable, causing cascading failures and context pollution. Third, the always-large strategy (Architecture C1) achieved the highest pass rate (81.7\%) while simultaneously reducing computational cost, as it avoided the retry overhead incurred by adaptive routing. Fourth, prompt repetition, contrary to findings in other domains, degraded multi-agent performance by up to 7.9 percentage points, likely due to increased context length interfering with the model's ability to focus on recent, critical feedback.
+
+\paragraph{Limitations.}
+This study has several limitations. Our evaluation is conducted on a single benchmark (HumanEval), and results may not generalize to other datasets with different problem distributions or longer code requirements. The set of models evaluated (Qwen and Llama families) represents a specific point in the rapidly evolving LLM landscape; more capable small models may validate the adaptive routing hypothesis. Story point thresholds and prompt designs were not extensively tuned, leaving potential for optimization. Finally, the execution environment (HuggingFace Inference API) introduces variability that may affect reproducibility.
+
+\paragraph{Future Work.}
+Several directions merit further investigation. Evaluating on additional benchmarks such as MBPP, APPS, or SWE-bench would assess generalization. Testing with more capable small models could validate whether adaptive routing becomes beneficial when all tiers exceed a capability threshold. Alternative difficulty estimation mechanisms, such as fine-tuned classifiers or ensemble methods, may improve routing accuracy. Dynamic prompt engineering that adapts to accumulated context length could address the prompt repetition degradation. Finally, incorporating human feedback in the review loop may further improve code quality beyond what automated testing can achieve.

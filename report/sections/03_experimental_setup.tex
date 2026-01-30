@@ -27,13 +27,29 @@ Language models were accessed through the HuggingFace Inference API, which provi
 
 We employ four categories of metrics to comprehensively evaluate the architectures.
 
-\paragraph{Primary Metrics.} The primary measure of functional correctness is the \textbf{Pass Rate}, defined as the percentage of tasks where all test assertions pass. We also report \textbf{Pass@1}, which measures correctness on the first generation attempt---for Architecture A this equals the pass rate, while for multi-agent architectures it reflects success before any retry or escalation. To quantify uncertainty, we compute \textbf{95\% confidence intervals} using the Wilson score interval for binomial proportions.
+\paragraph{Primary Metrics.} The primary measure of functional correctness is the \textbf{Pass Rate}, defined as the percentage of tasks where all test assertions pass. We also report \textbf{Pass@1}, which measures correctness on the first generation attempt (for Architecture A this equals the pass rate, while for multi-agent architectures it reflects success before any retry or escalation). To quantify uncertainty, we compute \textbf{95\% confidence intervals} using the Wilson score interval for binomial proportions.
 
 \paragraph{Cost Metrics.} To assess computational efficiency, we measure \textbf{Total Tokens} (sum of input and output tokens per task), \textbf{API Calls} (number of LLM invocations per task), and \textbf{Execution Time} (end-to-end wall-clock time per task in seconds). These metrics enable cost-benefit analysis of multi-agent overhead.
 
 \paragraph{Adaptive Metrics.} For architectures employing the multi-agent pipeline (B, C, C1, C2), we track additional metrics specific to the adaptive mechanisms. \textbf{Retry Count} measures the number of Developer$\rightarrow$Tester$\rightarrow$Reviewer loops executed until success or final failure. \textbf{Escalation Count} tracks the number of tier transitions (S$\rightarrow$M or M$\rightarrow$L) triggered by test failures. \textbf{Story Point Accuracy} evaluates the correlation between the Planner's difficulty estimate and actual task outcome. \textbf{Tier Distribution} reports the percentage of tasks routed to each developer tier (S/M/L).
 
-\paragraph{Static Code Quality Metrics.} Beyond functional correctness, we assess the quality of generated code using static analysis. \textbf{Cyclomatic Complexity (CC)} measures the number of linearly independent paths through the code, computed using the Radon library. Lower values indicate simpler, more testable code (1--5: simple, 6--10: moderate, 11+: complex). \textbf{Maintainability Index (MI)} is a composite metric incorporating Halstead Volume, cyclomatic complexity, and lines of code, with values ranging from 0 to 100 (higher indicates better maintainability). These metrics are computed for all generated solutions, enabling analysis of whether multi-agent pipelines produce more maintainable code.
+\paragraph{Static Code Quality Metrics.} Beyond functional correctness, we assess the quality of generated code using static analysis metrics computed via the Radon library.
+
+\textbf{Cyclomatic Complexity (CC)}, introduced by McCabe~\cite{mccabe1976complexity}, measures the number of linearly independent paths through a program's control flow graph. It is computed as:
+\begin{equation}
+    CC = E - N + 2P
+\end{equation}
+where $E$ is the number of edges in the control flow graph, $N$ is the number of nodes, and $P$ is the number of connected components (typically 1 for a single function). Each control flow statement (\texttt{if}, \texttt{elif}, \texttt{for}, \texttt{while}, \texttt{except}, \texttt{and}, \texttt{or}) increments the complexity by one. Following Ebert et al.~\cite{ebert2016cyclomatic}, we interpret CC values as: 1--5 (low risk, simple code), 6--10 (moderate risk), 11--20 (high risk, complex code), and 21+ (very high risk, untestable).
+
+\textbf{Maintainability Index (MI)} is a composite metric estimating how maintainable source code is~\cite{microsoft2024maintainability}. It is computed as:
+\begin{equation}
+    \resizebox{0.89\columnwidth}{!}{%
+    $MI = \max\left(0, \frac{100 \times (171 - 5.2 \ln(HV) - 0.23 \times CC - 16.2 \ln(LOC))}{171}\right)$%
+    }
+\end{equation}
+where $HV$ is the Halstead Volume (based on operator and operand counts), $CC$ is Cyclomatic Complexity, and $LOC$ is lines of code. The index ranges from 0 to 100, where higher values indicate better maintainability: 0--19 (low), 20--39 (moderate), 40--64 (good), 65--84 (high), and 85--100 (excellent).
+
+These metrics are computed for all generated solutions, enabling analysis of whether multi-agent pipelines produce more maintainable code compared to single-agent approaches.
 
 % -----------------------------------------------------------------------------
 \subsection{Experimental Configuration}

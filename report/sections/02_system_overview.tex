@@ -58,7 +58,7 @@ We evaluate five architectural configurations to isolate the effects of multi-ag
 
 \textbf{Architecture A} serves as the single-agent baseline. A single LLM receives the task and generates code in one pass without planning, review, or retry mechanisms.
 
-\textbf{Architecture B} introduces the full multi-agent pipeline while keeping the model constant. All roles---Planner, Developer (all tiers), and Reviewer---use the same model. This configuration isolates the effect of role separation and iterative refinement from model capacity differences.
+\textbf{Architecture B} introduces the full multi-agent pipeline while keeping the model constant. All roles (Planner, Developer (all tiers), and Reviewer) use the same model. This configuration isolates the effect of role separation and iterative refinement from model capacity differences.
 
 \textbf{Architecture C} employs specialized models for each role. The Planner and Reviewer use a generalist model suited for reasoning and analysis. The Developer role uses capacity-matched models: a small model (1.5B) for Tier S, a medium model (7B) for Tier M, and a large model (32B) for Tier L.
 

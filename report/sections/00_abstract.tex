@@ -1,13 +1,12 @@
 \begin{abstract}
 
-% TODO: Write abstract (max 200 words)
-% 
-% Suggested structure:
-% 1. Context: LLMs for code generation, limitations of single-prompt approaches
-% 2. Problem: Complex development tasks often fail with single-agent LLMs
-% 3. Approach: Multi-agent architectures with role separation (Planner, Developer, Tester, Reviewer)
-% 4. Experiments: Comparison of A (single-agent), B (multi-agent single-model), C (multi-agent multi-model)
-% 5. Key findings: Pass rates, effect of adaptive routing, prompt repetition results
-% 6. Conclusion: Main takeaways and implications
+Single-prompt code generation with Large Language Models (LLMs) frequently fails on tasks requiring multi-step reasoning or edge-case handling. Multi-agent architectures that decompose development into specialized roles (planning, implementation, testing, and review) offer a principled approach to iterative refinement, yet their empirical benefits remain underexplored.
+
+We conduct a controlled comparison of four LLM-based code generation architectures on the HumanEval benchmark (164 tasks): a single-agent baseline, a multi-agent pipeline using one model across all roles, a multi-agent system with tiered models (1.5B--32B parameters) and difficulty-based routing, and an always-large variant. We further evaluate prompt repetition, a technique that duplicates user queries to improve token attention.
+
+Multi-agent orchestration achieves 72.6\% pass rate versus 67.7\% for single-agent (+4.9 pp), with the review loop recovering 22\% of initially failing tasks. However, adaptive routing underperforms the always-large strategy (62.2\% vs 81.7\%), as the smallest model (1.5B) consistently fails and triggers costly escalation cascades. Prompt repetition degrades multi-agent accuracy by up to 7.9 pp, likely due to context dilution in already-rich conversation histories.
+
+These results demonstrate that multi-agent pipelines improve correctness when paired with sufficiently capable models, but adaptive routing provides no benefit when tier-S models fall below a reliability threshold. The findings inform the design of cost-effective LLM orchestration systems.
 
 \end{abstract}
+
